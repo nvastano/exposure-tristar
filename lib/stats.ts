@@ -1,4 +1,5 @@
 export type RawEntryRow = {
+  Id?: string;
   Timestamp: string;
   Date: string;
   Player: string;
@@ -8,6 +9,7 @@ export type RawEntryRow = {
 };
 
 export type Session = {
+  id: string;
   date: string;
   player: string;
   sprintTimes: number[];
@@ -32,6 +34,7 @@ export function normalizeSessions(rows: RawEntryRow[]): Session[] {
       const throwVelos = parseNumberCsv(row.ThrowVelos);
 
       return {
+        id: row.Id || "",
         date: row.Date,
         player: row.Player,
         sprintTimes,
