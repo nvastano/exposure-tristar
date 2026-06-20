@@ -1,8 +1,8 @@
 /**
  * TriStar Baseball — Google Sheets backend.
  * Paste this into Extensions > Apps Script of your Google Sheet, then
- * Deploy > New deployment > Web app (Execute as: Me, Access: Anyone with the link).
- * Copy the deployment URL into SHEETS_WEBAPP_URL in the Next.js app's env.
+ * Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+ * Copy the deployment URL into NEXT_PUBLIC_SHEETS_WEBAPP_URL in the app's env.
  */
 
 var PLAYERS_SHEET = "Players";
@@ -27,11 +27,8 @@ function entriesSheet_() {
     "Timestamp",
     "Date",
     "Player",
-    "Sprint1",
-    "Sprint2",
-    "Sprint3",
-    "Throw1",
-    "Throw2",
+    "SprintTimes",
+    "ThrowVelos",
     "Notes",
   ]);
 }
@@ -80,6 +77,17 @@ function doGet(e) {
   );
 }
 
+function appendEntry_(sheet, entry) {
+  sheet.appendRow([
+    new Date().toISOString(),
+    entry.date,
+    entry.player,
+    (entry.sprintTimes || []).join(","),
+    (entry.throwVelos || []).join(","),
+    entry.notes || "",
+  ]);
+}
+
 function doPost(e) {
   var body = JSON.parse(e.postData.contents);
   var result;
@@ -89,33 +97,13 @@ function doPost(e) {
     result = { ok: true };
   } else if (body.action === "addEntry") {
     ensurePlayer_(body.player);
-    entriesSheet_().appendRow([
-      new Date().toISOString(),
-      body.date,
-      body.player,
-      (body.sprintTimes && body.sprintTimes[0]) || "",
-      (body.sprintTimes && body.sprintTimes[1]) || "",
-      (body.sprintTimes && body.sprintTimes[2]) || "",
-      (body.throwVelos && body.throwVelos[0]) || "",
-      (body.throwVelos && body.throwVelos[1]) || "",
-      body.notes || "",
-    ]);
+    appendEntry_(entriesSheet_(), body);
     result = { ok: true };
   } else if (body.action === "bulkEntries") {
     var sheet = entriesSheet_();
     body.entries.forEach(function (entry) {
       ensurePlayer_(entry.player);
-      sheet.appendRow([
-        new Date().toISOString(),
-        entry.date,
-        entry.player,
-        (entry.sprintTimes && entry.sprintTimes[0]) || "",
-        (entry.sprintTimes && entry.sprintTimes[1]) || "",
-        (entry.sprintTimes && entry.sprintTimes[2]) || "",
-        (entry.throwVelos && entry.throwVelos[0]) || "",
-        (entry.throwVelos && entry.throwVelos[1]) || "",
-        entry.notes || ""
-      ]);
+      appendEntry_(sheet, entry);
     });
     result = { ok: true, count: body.entries.length };
   } else {

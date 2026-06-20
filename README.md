@@ -33,7 +33,7 @@ The script auto-creates `Players` and `Entries` tabs in the sheet on first use.
 
 - `/` — team dashboard, latest best times/velocities per player with
   session-over-session deltas.
-- `/entry` — coach input. Paste lines like:
-  `Cafrey - 4.53; 4.43; 4.78 / 50; 48` (sprint times / throw velocities), or
-  `Bryson - n/a` for players with no data that day.
-- `/players/[name]` — individual player charts and full session history.
+- `/entry` — coach input. Select an existing player or add a new one, set the
+  session date, then add as many sprint-time and throw-velocity readings as
+  were captured that day.
+- `/players?name=X` — individual player charts and full session history.
