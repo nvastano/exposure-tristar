@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { METRIC_DEFS } from "@/lib/metrics";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const NEW_PLAYER = "__new__";
@@ -12,10 +13,12 @@ export default function EntryPage() {
   const [players, setPlayers] = useState<string[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerPhoto, setNewPlayerPhoto] = useState("");
   const [date, setDate] = useState(TODAY);
   const [sprintTimes, setSprintTimes] = useState<string[]>([""]);
   const [throwVelos, setThrowVelos] = useState<string[]>([""]);
   const [notes, setNotes] = useState("");
+  const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,28 +66,48 @@ export default function EntryPage() {
     const cleanSprints = sprintTimes.map((s) => parseFloat(s)).filter((n) => Number.isFinite(n) && n > 0);
     const cleanThrows = throwVelos.map((s) => parseFloat(s)).filter((n) => Number.isFinite(n) && n > 0);
 
-    if (!cleanSprints.length && !cleanThrows.length) {
-      setStatus("Error: enter at least one sprint time or throw velocity.");
+    const metricEntries = METRIC_DEFS.filter((def) => {
+      const v = metricValues[def.key];
+      return def.type === "boolean" ? v === true : Boolean(v && String(v).trim());
+    }).map((def) => ({
+      date,
+      player: playerName,
+      metric: def.key,
+      value: def.type === "boolean" ? "yes" : String(metricValues[def.key]),
+    }));
+
+    if (!cleanSprints.length && !cleanThrows.length && !metricEntries.length) {
+      setStatus("Error: enter at least one sprint time, throw velocity, or other stat.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await sheetsPost("addEntry", {
-        date,
-        player: playerName,
-        sprintTimes: cleanSprints,
-        throwVelos: cleanThrows,
-        notes,
-      });
+      if (isNewPlayer && newPlayerPhoto.trim()) {
+        await sheetsPost("addPlayer", { name: playerName, photo: newPlayerPhoto.trim() });
+      }
+      if (cleanSprints.length || cleanThrows.length) {
+        await sheetsPost("addEntry", {
+          date,
+          player: playerName,
+          sprintTimes: cleanSprints,
+          throwVelos: cleanThrows,
+          notes,
+        });
+      }
+      if (metricEntries.length) {
+        await sheetsPost("bulkMetrics", { entries: metricEntries });
+      }
       setStatus(`Saved session for ${playerName} on ${date}.`);
       setSprintTimes([""]);
       setThrowVelos([""]);
       setNotes("");
+      setMetricValues({});
       if (isNewPlayer) {
         setPlayers((prev) => [...prev, playerName]);
         setSelectedPlayer(playerName);
         setNewPlayerName("");
+        setNewPlayerPhoto("");
       }
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -122,16 +145,28 @@ export default function EntryPage() {
       </label>
 
       {isNewPlayer && (
-        <label className="flex flex-col gap-1 text-sm">
-          New player name
-          <input
-            type="text"
-            value={newPlayerName}
-            onChange={(e) => setNewPlayerName(e.target.value)}
-            placeholder="e.g. Cafrey"
-            className="bg-white/5 border border-white/10 rounded px-3 py-2"
-          />
-        </label>
+        <>
+          <label className="flex flex-col gap-1 text-sm">
+            New player name
+            <input
+              type="text"
+              value={newPlayerName}
+              onChange={(e) => setNewPlayerName(e.target.value)}
+              placeholder="e.g. Cafrey"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Photo filename (optional)
+            <input
+              type="text"
+              value={newPlayerPhoto}
+              onChange={(e) => setNewPlayerPhoto(e.target.value)}
+              placeholder="e.g. hudson-vastano.jpg (drop the file in public/players/)"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            />
+          </label>
+        </>
       )}
 
       <label className="flex flex-col gap-1 text-sm w-48">
@@ -171,6 +206,37 @@ export default function EntryPage() {
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
+
+      <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+        <span className="text-sm text-white/50">Other workouts</span>
+        {METRIC_DEFS.map((def) =>
+          def.type === "boolean" ? (
+            <label key={def.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={metricValues[def.key] === true}
+                onChange={(e) =>
+                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
+                }
+                className="w-4 h-4"
+              />
+              {def.label}
+            </label>
+          ) : (
+            <label key={def.key} className="flex flex-col gap-1 text-sm">
+              {def.label}
+              <input
+                type="number"
+                value={(metricValues[def.key] as string) || ""}
+                onChange={(e) =>
+                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
+                }
+                className="bg-white/5 border border-white/10 rounded px-3 py-2 w-32"
+              />
+            </label>
+          )
+        )}
+      </div>
 
       <button
         onClick={handleSubmit}

@@ -1,0 +1,192 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { METRIC_DEFS } from "@/lib/metrics";
+
+const TODAY = new Date().toISOString().slice(0, 10);
+
+type PlayerRow = { Name: string };
+
+export default function LogPage() {
+  const [players, setPlayers] = useState<string[]>([]);
+  const [player, setPlayer] = useState("");
+  const [date, setDate] = useState(TODAY);
+  const [sprintTimes, setSprintTimes] = useState("");
+  const [throwVelos, setThrowVelos] = useState("");
+  const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
+  const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = (await sheetsGet("players")) as PlayerRow[];
+        setPlayers(data.map((p) => p.Name).filter(Boolean));
+      } catch {
+        // sheet not connected yet
+      }
+    })();
+  }, []);
+
+  async function handleSubmit() {
+    setStatus(null);
+    if (!player) {
+      setStatus("Pick your name first.");
+      return;
+    }
+
+    const cleanSprints = sprintTimes
+      .split(",")
+      .map((s) => parseFloat(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const cleanThrows = throwVelos
+      .split(",")
+      .map((s) => parseFloat(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+    setSubmitting(true);
+    try {
+      if (cleanSprints.length || cleanThrows.length) {
+        await sheetsPost("addEntry", {
+          date,
+          player,
+          sprintTimes: cleanSprints,
+          throwVelos: cleanThrows,
+        });
+      }
+
+      const metricEntries = METRIC_DEFS.filter((def) => {
+        const v = metricValues[def.key];
+        return def.type === "boolean" ? v === true : Boolean(v && String(v).trim());
+      }).map((def) => ({
+        date,
+        player,
+        metric: def.key,
+        value: def.type === "boolean" ? "yes" : String(metricValues[def.key]),
+      }));
+
+      if (metricEntries.length) {
+        await sheetsPost("bulkMetrics", { entries: metricEntries });
+      }
+
+      if (!cleanSprints.length && !cleanThrows.length && !metricEntries.length) {
+        setStatus("Enter at least one stat before submitting.");
+        setSubmitting(false);
+        return;
+      }
+
+      setStatus(`Saved your stats for ${date}!`);
+      setSprintTimes("");
+      setThrowVelos("");
+      setMetricValues({});
+    } catch (err) {
+      setStatus(`Error: ${(err as Error).message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6 max-w-xl">
+      <div>
+        <h1 className="text-2xl font-bold tracking-wide">LOG YOUR STATS</h1>
+        <p className="text-white/50 text-sm mt-1">
+          Pick your name and fill in whatever you did today. Leave anything blank that doesn&apos;t apply.
+        </p>
+      </div>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Your name
+        <select
+          value={player}
+          onChange={(e) => setPlayer(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded px-3 py-2"
+        >
+          <option value="" disabled>
+            Select your name...
+          </option>
+          {players.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm w-48">
+        Date
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded px-3 py-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Sprint times — home to 1st, seconds (comma separated)
+        <input
+          type="text"
+          value={sprintTimes}
+          onChange={(e) => setSprintTimes(e.target.value)}
+          placeholder="4.53, 4.43, 4.78"
+          className="bg-white/5 border border-white/10 rounded px-3 py-2"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Throw velocities — 3rd to 1st, mph (comma separated)
+        <input
+          type="text"
+          value={throwVelos}
+          onChange={(e) => setThrowVelos(e.target.value)}
+          placeholder="50, 48"
+          className="bg-white/5 border border-white/10 rounded px-3 py-2"
+        />
+      </label>
+
+      <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+        <span className="text-sm text-white/50">Other workouts today</span>
+        {METRIC_DEFS.map((def) =>
+          def.type === "boolean" ? (
+            <label key={def.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={metricValues[def.key] === true}
+                onChange={(e) =>
+                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
+                }
+                className="w-4 h-4"
+              />
+              {def.label}
+            </label>
+          ) : (
+            <label key={def.key} className="flex flex-col gap-1 text-sm">
+              {def.label}
+              {def.unit && <span className="text-white/30 text-xs">{def.unit}</span>}
+              <input
+                type="number"
+                value={(metricValues[def.key] as string) || ""}
+                onChange={(e) =>
+                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
+                }
+                className="bg-white/5 border border-white/10 rounded px-3 py-2 w-32"
+              />
+            </label>
+          )
+        )}
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={submitting}
+        className="self-start bg-accent hover:bg-accent/80 transition-colors text-white font-semibold px-5 py-2.5 rounded disabled:opacity-50"
+      >
+        {submitting ? "Saving..." : "Save my stats"}
+      </button>
+
+      {status && <p className="text-sm text-white/70">{status}</p>}
+    </div>
+  );
+}

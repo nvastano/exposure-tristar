@@ -45,6 +45,9 @@ export default function RootLayout({
             <Link href="/entry" className="hover:text-accent transition-colors">
               COACH ENTRY
             </Link>
+            <Link href="/log" className="hover:text-accent transition-colors">
+              LOG STATS
+            </Link>
           </nav>
         </header>
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto">{children}</main>
