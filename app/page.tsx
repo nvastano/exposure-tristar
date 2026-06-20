@@ -1,65 +1,125 @@
-import Image from "next/image";
+import Link from "next/link";
+import { sheetsGet } from "@/lib/sheets";
+import { normalizeSessions, latestSession, sprintDelta, throwDelta } from "@/lib/stats";
+import type { RawEntryRow } from "@/lib/stats";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+type PlayerRow = { Name: string; Position?: string };
+
+async function loadData() {
+  try {
+    const [players, entries] = await Promise.all([
+      sheetsGet("players") as Promise<PlayerRow[]>,
+      sheetsGet("entries") as Promise<RawEntryRow[]>,
+    ]);
+    return { players, entries, error: null as string | null };
+  } catch (err) {
+    return { players: [] as PlayerRow[], entries: [] as RawEntryRow[], error: (err as Error).message };
+  }
+}
+
+export default async function Home() {
+  const { players, entries, error } = await loadData();
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-accent/40 bg-accent/10 p-6 text-sm">
+        <p className="font-semibold mb-1">Sheet not connected yet</p>
+        <p className="text-white/70">{error}</p>
+        <p className="text-white/50 mt-2">
+          Deploy the Apps Script Web App and set <code className="text-accent">SHEETS_WEBAPP_URL</code> in your
+          environment.
+        </p>
+      </div>
+    );
+  }
+
+  const byPlayer = new Map<string, ReturnType<typeof normalizeSessions>>();
+  for (const p of players) byPlayer.set(p.Name, []);
+  const allSessions = normalizeSessions(entries);
+  for (const s of allSessions) {
+    if (!byPlayer.has(s.player)) byPlayer.set(s.player, []);
+    byPlayer.get(s.player)!.push(s);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-wide">TEAM DASHBOARD</h1>
+        <p className="text-white/50 text-sm mt-1">
+          Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
+        </p>
+      </div>
+
+      {byPlayer.size === 0 && (
+        <p className="text-white/50 text-sm">No players yet. Add data on the Coach Entry page.</p>
+      )}
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from(byPlayer.entries()).map(([name, sessions]) => {
+          const latest = latestSession(sessions);
+          const sDelta = sprintDelta(sessions);
+          const tDelta = throwDelta(sessions);
+
+          return (
+            <Link
+              key={name}
+              href={`/players/${encodeURIComponent(name)}`}
+              className="rounded-lg border border-white/10 p-5 hover:border-accent/60 transition-colors flex flex-col gap-3"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+              <span className="font-bold text-lg">{name}</span>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-white/50">Best sprint (home–1st)</span>
+                <span className="font-mono">
+                  {latest?.bestSprint ? `${latest.bestSprint.toFixed(2)}s` : "—"}
+                </span>
+              </div>
+              {sDelta !== null && (
+                <DeltaBadge value={sDelta} betterWhenNegative label="vs last session" unit="s" />
+              )}
+
+              <div className="flex justify-between text-sm">
+                <span className="text-white/50">Best throw (3rd–1st)</span>
+                <span className="font-mono">
+                  {latest?.bestThrow ? `${latest.bestThrow.toFixed(0)} mph` : "—"}
+                </span>
+              </div>
+              {tDelta !== null && (
+                <DeltaBadge value={tDelta} betterWhenNegative={false} label="vs last session" unit=" mph" />
+              )}
+
+              {sessions.length === 0 && <span className="text-white/30 text-xs">No sessions logged yet</span>}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DeltaBadge({
+  value,
+  betterWhenNegative,
+  label,
+  unit,
+}: {
+  value: number;
+  betterWhenNegative: boolean;
+  label: string;
+  unit: string;
+}) {
+  const improved = betterWhenNegative ? value < 0 : value > 0;
+  const sign = value > 0 ? "+" : "";
+  return (
+    <div className="flex justify-between text-xs">
+      <span className="text-white/30">{label}</span>
+      <span className={improved ? "text-green-400" : "text-accent"}>
+        {sign}
+        {value.toFixed(2)}
+        {unit}
+      </span>
     </div>
   );
 }
