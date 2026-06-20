@@ -1,26 +1,13 @@
-const WEBAPP_URL = process.env.SHEETS_WEBAPP_URL;
+const WEBAPP_URL = process.env.NEXT_PUBLIC_SHEETS_WEBAPP_URL;
 
 function requireUrl(): string {
   if (!WEBAPP_URL) {
     throw new Error(
-      "SHEETS_WEBAPP_URL is not set. Deploy the Apps Script Web App and add the URL to your environment."
+      "NEXT_PUBLIC_SHEETS_WEBAPP_URL is not set. Deploy the Apps Script Web App and add the URL to your environment."
     );
   }
   return WEBAPP_URL;
 }
-
-export type Player = {
-  name: string;
-  position?: string;
-};
-
-export type SessionEntry = {
-  date: string;
-  player: string;
-  sprintTimes: number[];
-  throwVelos: number[];
-  notes?: string;
-};
 
 export async function sheetsGet(action: string, params: Record<string, string> = {}) {
   const url = new URL(requireUrl());

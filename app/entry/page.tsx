@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { parseQuickPaste } from "@/lib/parse";
+import { sheetsPost } from "@/lib/sheets";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -31,12 +32,7 @@ export default function EntryPage() {
         .filter((p) => p.sprintTimes.length || p.throwVelos.length)
         .map((p) => ({ ...p, date }));
 
-      const res = await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to save");
+      await sheetsPost("bulkEntries", { entries });
       setStatus(`Saved ${entries.length} player session(s) for ${date}.`);
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);

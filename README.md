@@ -2,7 +2,11 @@
 
 Tracks player home-to-first sprint times and 3rd-to-1st throw velocity, with a
 coach entry page and a player progress dashboard. Data is stored in a Google
-Sheet via a small Apps Script web app — no database to manage.
+Sheet via a small Apps Script web app — no database to manage. The app is a
+static export, deployed to GitHub Pages, the same way as
+[V3D_Creative](https://nvastano.github.io/V3D_Creative/index.html).
+
+Live at: https://nvastano.github.io/exposure-tristar/
 
 ## Setup
 
@@ -13,8 +17,15 @@ Sheet via a small Apps Script web app — no database to manage.
    - Execute as: **Me**
    - Who has access: **Anyone with the link**
 4. Deploy and copy the resulting web app URL.
-5. Copy `.env.local.example` to `.env.local` and set `SHEETS_WEBAPP_URL` to that URL.
-6. `npm install && npm run dev`.
+5. In the GitHub repo, go to **Settings > Secrets and variables > Actions >
+   Variables** and add `NEXT_PUBLIC_SHEETS_WEBAPP_URL` set to that URL (the
+   deploy workflow reads it at build time).
+6. In **Settings > Pages**, set Source to **GitHub Actions**.
+7. Push to `main` — the workflow in `.github/workflows/deploy.yml` builds and
+   publishes to GitHub Pages automatically.
+
+For local development: copy `.env.local.example` to `.env.local`, set
+`NEXT_PUBLIC_SHEETS_WEBAPP_URL`, then `npm install && npm run dev`.
 
 The script auto-creates `Players` and `Entries` tabs in the sheet on first use.
 

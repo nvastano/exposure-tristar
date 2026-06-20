@@ -1,26 +1,43 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { sheetsGet } from "@/lib/sheets";
 import { normalizeSessions, latestSession, sprintDelta, throwDelta } from "@/lib/stats";
-import type { RawEntryRow } from "@/lib/stats";
-
-export const dynamic = "force-dynamic";
+import type { RawEntryRow, Session } from "@/lib/stats";
 
 type PlayerRow = { Name: string; Position?: string };
 
-async function loadData() {
-  try {
-    const [players, entries] = await Promise.all([
-      sheetsGet("players") as Promise<PlayerRow[]>,
-      sheetsGet("entries") as Promise<RawEntryRow[]>,
-    ]);
-    return { players, entries, error: null as string | null };
-  } catch (err) {
-    return { players: [] as PlayerRow[], entries: [] as RawEntryRow[], error: (err as Error).message };
-  }
-}
+export default function Home() {
+  const [byPlayer, setByPlayer] = useState<Map<string, Session[]>>(new Map());
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-export default async function Home() {
-  const { players, entries, error } = await loadData();
+  useEffect(() => {
+    (async () => {
+      try {
+        const [playersData, entriesData] = await Promise.all([
+          sheetsGet("players") as Promise<PlayerRow[]>,
+          sheetsGet("entries") as Promise<RawEntryRow[]>,
+        ]);
+        const map = new Map<string, Session[]>();
+        for (const p of playersData) map.set(p.Name, []);
+        for (const s of normalizeSessions(entriesData)) {
+          if (!map.has(s.player)) map.set(s.player, []);
+          map.get(s.player)!.push(s);
+        }
+        setByPlayer(map);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return <p className="text-white/50 text-sm">Loading...</p>;
+  }
 
   if (error) {
     return (
@@ -28,19 +45,11 @@ export default async function Home() {
         <p className="font-semibold mb-1">Sheet not connected yet</p>
         <p className="text-white/70">{error}</p>
         <p className="text-white/50 mt-2">
-          Deploy the Apps Script Web App and set <code className="text-accent">SHEETS_WEBAPP_URL</code> in your
-          environment.
+          Deploy the Apps Script Web App and set{" "}
+          <code className="text-accent">NEXT_PUBLIC_SHEETS_WEBAPP_URL</code> in your environment.
         </p>
       </div>
     );
-  }
-
-  const byPlayer = new Map<string, ReturnType<typeof normalizeSessions>>();
-  for (const p of players) byPlayer.set(p.Name, []);
-  const allSessions = normalizeSessions(entries);
-  for (const s of allSessions) {
-    if (!byPlayer.has(s.player)) byPlayer.set(s.player, []);
-    byPlayer.get(s.player)!.push(s);
   }
 
   return (
@@ -65,7 +74,7 @@ export default async function Home() {
           return (
             <Link
               key={name}
-              href={`/players/${encodeURIComponent(name)}`}
+              href={`/players?name=${encodeURIComponent(name)}`}
               className="rounded-lg border border-white/10 p-5 hover:border-accent/60 transition-colors flex flex-col gap-3"
             >
               <span className="font-bold text-lg">{name}</span>

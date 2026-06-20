@@ -1,24 +1,40 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { sheetsGet } from "@/lib/sheets";
 import { normalizeSessions } from "@/lib/stats";
-import type { RawEntryRow } from "@/lib/stats";
+import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerCharts from "./PlayerCharts";
 
-export const dynamic = "force-dynamic";
+function PlayerContent() {
+  const searchParams = useSearchParams();
+  const playerName = searchParams.get("name") || "";
 
-export default async function PlayerPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = await params;
-  const playerName = decodeURIComponent(name);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(Boolean(playerName));
 
-  let entries: RawEntryRow[] = [];
-  let error: string | null = null;
-  try {
-    entries = (await sheetsGet("entries", { player: playerName })) as RawEntryRow[];
-  } catch (err) {
-    error = (err as Error).message;
+  useEffect(() => {
+    if (!playerName) return;
+    (async () => {
+      try {
+        const entries = (await sheetsGet("entries", { player: playerName })) as RawEntryRow[];
+        setSessions(normalizeSessions(entries));
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [playerName]);
+
+  if (!playerName) {
+    return <p className="text-white/50 text-sm">No player selected.</p>;
+  }
+
+  if (loading) {
+    return <p className="text-white/50 text-sm">Loading...</p>;
   }
 
   if (error) {
@@ -29,8 +45,6 @@ export default async function PlayerPage({
       </div>
     );
   }
-
-  const sessions = normalizeSessions(entries);
 
   return (
     <div className="flex flex-col gap-8">
@@ -81,5 +95,13 @@ export default async function PlayerPage({
         </>
       )}
     </div>
+  );
+}
+
+export default function PlayerPage() {
+  return (
+    <Suspense fallback={<p className="text-white/50 text-sm">Loading...</p>}>
+      <PlayerContent />
+    </Suspense>
   );
 }
