@@ -2,11 +2,8 @@ export type RawEntryRow = {
   Timestamp: string;
   Date: string;
   Player: string;
-  Sprint1?: number | string;
-  Sprint2?: number | string;
-  Sprint3?: number | string;
-  Throw1?: number | string;
-  Throw2?: number | string;
+  SprintTimes?: string;
+  ThrowVelos?: string;
   Notes?: string;
 };
 
@@ -20,20 +17,19 @@ export type Session = {
   notes: string;
 };
 
-function toNum(v: unknown): number | null {
-  const n = typeof v === "number" ? v : parseFloat(String(v));
-  return Number.isFinite(n) && n > 0 ? n : null;
+function parseNumberCsv(v: string | undefined): number[] {
+  if (!v) return [];
+  return String(v)
+    .split(",")
+    .map((s) => parseFloat(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
 export function normalizeSessions(rows: RawEntryRow[]): Session[] {
   return rows
     .map((row) => {
-      const sprintTimes = [row.Sprint1, row.Sprint2, row.Sprint3]
-        .map(toNum)
-        .filter((n): n is number => n !== null);
-      const throwVelos = [row.Throw1, row.Throw2]
-        .map(toNum)
-        .filter((n): n is number => n !== null);
+      const sprintTimes = parseNumberCsv(row.SprintTimes);
+      const throwVelos = parseNumberCsv(row.ThrowVelos);
 
       return {
         date: row.Date,
