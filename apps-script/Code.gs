@@ -43,18 +43,26 @@ function backfillIds_(sheet) {
   }
 }
 
+// "Date" is kept as plain text so Sheets doesn't auto-convert it to a Date
+// cell, which would otherwise shift the day when read back across timezones.
+function setCell_(sheet, row, col, header, value) {
+  var cell = sheet.getRange(row, col);
+  if (header === "Date") cell.setNumberFormat("@");
+  cell.setValue(value);
+}
+
 function appendRowByHeaders_(sheet, valuesByHeader) {
   var row = sheet.getLastRow() + 1;
   Object.keys(valuesByHeader).forEach(function (header) {
     var col = ensureColumn_(sheet, header);
-    sheet.getRange(row, col).setValue(valuesByHeader[header]);
+    setCell_(sheet, row, col, header, valuesByHeader[header]);
   });
 }
 
 function setRowByHeaders_(sheet, row, valuesByHeader) {
   Object.keys(valuesByHeader).forEach(function (header) {
     var col = ensureColumn_(sheet, header);
-    sheet.getRange(row, col).setValue(valuesByHeader[header]);
+    setCell_(sheet, row, col, header, valuesByHeader[header]);
   });
 }
 

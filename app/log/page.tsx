@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { METRIC_DEFS } from "@/lib/metrics";
+import { localDateStr } from "@/lib/stats";
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = localDateStr();
 
 type PlayerRow = { Name: string };
 

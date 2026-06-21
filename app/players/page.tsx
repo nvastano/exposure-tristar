@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { normalizeSessions } from "@/lib/stats";
+import { normalizeSessions, formatDate } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import type { RawMetricRow } from "@/lib/metrics";
 import { metricDef } from "@/lib/metrics";
@@ -203,7 +203,7 @@ function PlayerContent() {
                 .reverse()
                 .map((m) => (
                   <tr key={m.Id} className="border-t border-white/10">
-                    <td className="px-4 py-2 whitespace-nowrap">{m.Date}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{formatDate(m.Date)}</td>
                     <td className="px-4 py-2">{metricDef(m.Metric)?.label || m.Metric}</td>
                     <td className="px-4 py-2 font-mono">{m.Value}</td>
                     <td className="px-4 py-2">

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { localDateStr } from "@/lib/stats";
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = localDateStr();
 const NEW_PLAYER = "__new__";
 
 type StatType = "sprint" | "throw";

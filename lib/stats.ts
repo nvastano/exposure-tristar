@@ -8,6 +8,19 @@ export type RawEntryRow = {
   Notes?: string;
 };
 
+export function localDateStr(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Sheet "Date" cells can come back as a Date object (serialized to a full
+// ISO timestamp) if Sheets auto-detected the type — trim to the date part.
+export function formatDate(date: string): string {
+  return date.slice(0, 10);
+}
+
 export type Session = {
   id: string;
   date: string;
@@ -35,7 +48,7 @@ export function normalizeSessions(rows: RawEntryRow[]): Session[] {
 
       return {
         id: row.Id || "",
-        date: row.Date,
+        date: formatDate(row.Date),
         player: row.Player,
         sprintTimes,
         throwVelos,
