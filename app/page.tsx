@@ -7,7 +7,18 @@ import { normalizeSessions, latestSession, sprintDelta, throwDelta } from "@/lib
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 
-type PlayerRow = { Id: string; Name: string; Position?: string };
+type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
+
+function sortByNumber(players: PlayerRow[]): PlayerRow[] {
+  return players.slice().sort((a, b) => {
+    const an = parseInt(a.Number || "", 10);
+    const bn = parseInt(b.Number || "", 10);
+    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+    if (Number.isFinite(an)) return -1;
+    if (Number.isFinite(bn)) return 1;
+    return a.Name.localeCompare(b.Name);
+  });
+}
 
 export default function Home() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -23,7 +34,7 @@ export default function Home() {
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries") as Promise<RawEntryRow[]>,
       ]);
-      setPlayers(playersData);
+      setPlayers(sortByNumber(playersData));
       const map = new Map<string, Session[]>();
       for (const p of playersData) map.set(p.Name, []);
       for (const s of normalizeSessions(entriesData)) {
@@ -118,6 +129,9 @@ export default function Home() {
                     />
                   ) : (
                     <Link href={`/players?name=${encodeURIComponent(player.Name)}`} className="font-bold text-lg truncate block">
+                      {player.Number && (
+                        <span className="text-accent font-mono mr-1.5">#{player.Number}</span>
+                      )}
                       {player.Name}
                     </Link>
                   )}
