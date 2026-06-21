@@ -19,12 +19,58 @@ function getSheet_(name, headers) {
   return sheet;
 }
 
+// Columns are looked up by header name rather than fixed position, and
+// missing columns are created on the fly — sheets that predate a given
+// column (e.g. an older Players sheet without "Number") self-heal the
+// first time they're read or written, no manual migration required.
+function ensureColumn_(sheet, header) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var idx = headers.indexOf(header);
+  if (idx !== -1) return idx + 1;
+  var col = sheet.getLastColumn() + 1;
+  sheet.getRange(1, col).setValue(header);
+  return col;
+}
+
+function backfillIds_(sheet) {
+  var idCol = ensureColumn_(sheet, "Id");
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][idCol - 1]) {
+      sheet.getRange(i + 1, idCol).setValue(newId_());
+    }
+  }
+}
+
+function appendRowByHeaders_(sheet, valuesByHeader) {
+  var row = sheet.getLastRow() + 1;
+  Object.keys(valuesByHeader).forEach(function (header) {
+    var col = ensureColumn_(sheet, header);
+    sheet.getRange(row, col).setValue(valuesByHeader[header]);
+  });
+}
+
+function setRowByHeaders_(sheet, row, valuesByHeader) {
+  Object.keys(valuesByHeader).forEach(function (header) {
+    var col = ensureColumn_(sheet, header);
+    sheet.getRange(row, col).setValue(valuesByHeader[header]);
+  });
+}
+
 function playersSheet_() {
-  return getSheet_(PLAYERS_SHEET, ["Id", "Name", "Position", "Photo", "CreatedAt"]);
+  var sheet = getSheet_(PLAYERS_SHEET, ["Id", "Name", "Number", "Position", "CreatedAt"]);
+  ensureColumn_(sheet, "Id");
+  ensureColumn_(sheet, "Name");
+  ensureColumn_(sheet, "Number");
+  ensureColumn_(sheet, "Position");
+  ensureColumn_(sheet, "CreatedAt");
+  backfillIds_(sheet);
+  return sheet;
 }
 
 function entriesSheet_() {
-  return getSheet_(ENTRIES_SHEET, [
+  var sheet = getSheet_(ENTRIES_SHEET, [
     "Id",
     "Timestamp",
     "Date",
@@ -33,70 +79,36 @@ function entriesSheet_() {
     "ThrowVelos",
     "Notes",
   ]);
+  backfillIds_(sheet);
+  return sheet;
 }
 
 function metricsSheet_() {
-  return getSheet_(METRICS_SHEET, ["Id", "Timestamp", "Date", "Player", "Metric", "Value"]);
+  var sheet = getSheet_(METRICS_SHEET, ["Id", "Timestamp", "Date", "Player", "Metric", "Value"]);
+  backfillIds_(sheet);
+  return sheet;
 }
 
 function newId_() {
   return Utilities.getUuid();
 }
 
-/**
- * One-time migration: run this manually from the Apps Script editor
- * (select migrate_ in the function dropdown, click Run) after pasting
- * this updated code, if your Players/Entries/Metrics sheets predate the
- * Id/Photo columns. Safe to run more than once.
- */
-function migrate_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  var players = ss.getSheetByName(PLAYERS_SHEET);
-  if (players) {
-    var pHeaders = players.getRange(1, 1, 1, players.getLastColumn()).getValues()[0];
-    if (pHeaders[0] !== "Id") {
-      players.insertColumnBefore(1);
-      players.getRange(1, 1).setValue("Id");
-      var pRows = players.getLastRow();
-      for (var i = 2; i <= pRows; i++) {
-        players.getRange(i, 1).setValue(newId_());
-      }
-    }
-    var pHeaders2 = players.getRange(1, 1, 1, players.getLastColumn()).getValues()[0];
-    if (pHeaders2.indexOf("Photo") === -1) {
-      var createdAtCol = pHeaders2.indexOf("CreatedAt") + 1;
-      var insertAt = createdAtCol > 0 ? createdAtCol : players.getLastColumn() + 1;
-      players.insertColumnBefore(insertAt);
-      players.getRange(1, insertAt).setValue("Photo");
-    }
-  }
-
-  var entries = ss.getSheetByName(ENTRIES_SHEET);
-  if (entries) {
-    var eHeaders = entries.getRange(1, 1, 1, entries.getLastColumn()).getValues()[0];
-    if (eHeaders[0] !== "Id") {
-      entries.insertColumnBefore(1);
-      entries.getRange(1, 1).setValue("Id");
-      var eRows = entries.getLastRow();
-      for (var j = 2; j <= eRows; j++) {
-        entries.getRange(j, 1).setValue(newId_());
-      }
-    }
-  }
-
-  metricsSheet_(); // creates Metrics sheet with headers if missing
-}
-
-function ensurePlayer_(name, position, photo) {
+function ensurePlayer_(name, position, number) {
   var sheet = playersSheet_();
+  var nameCol = ensureColumn_(sheet, "Name");
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][1]).trim().toLowerCase() === name.trim().toLowerCase()) {
+    if (String(data[i][nameCol - 1]).trim().toLowerCase() === name.trim().toLowerCase()) {
       return;
     }
   }
-  sheet.appendRow([newId_(), name, position || "", photo || "", new Date().toISOString()]);
+  appendRowByHeaders_(sheet, {
+    Id: newId_(),
+    Name: name,
+    Number: number || "",
+    Position: position || "",
+    CreatedAt: new Date().toISOString(),
+  });
 }
 
 function rowsToObjects_(data) {
@@ -111,9 +123,10 @@ function rowsToObjects_(data) {
 }
 
 function findRowById_(sheet, id) {
+  var idCol = ensureColumn_(sheet, "Id");
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) return i + 1; // 1-indexed sheet row
+    if (String(data[i][idCol - 1]) === String(id)) return i + 1; // 1-indexed sheet row
   }
   return -1;
 }
@@ -151,21 +164,28 @@ function doGet(e) {
 
 function appendEntry_(sheet, entry) {
   var id = newId_();
-  sheet.appendRow([
-    id,
-    new Date().toISOString(),
-    entry.date,
-    entry.player,
-    (entry.sprintTimes || []).join(","),
-    (entry.throwVelos || []).join(","),
-    entry.notes || "",
-  ]);
+  appendRowByHeaders_(sheet, {
+    Id: id,
+    Timestamp: new Date().toISOString(),
+    Date: entry.date,
+    Player: entry.player,
+    SprintTimes: (entry.sprintTimes || []).join(","),
+    ThrowVelos: (entry.throwVelos || []).join(","),
+    Notes: entry.notes || "",
+  });
   return id;
 }
 
 function appendMetric_(sheet, m) {
   var id = newId_();
-  sheet.appendRow([id, new Date().toISOString(), m.date, m.player, m.metric, m.value]);
+  appendRowByHeaders_(sheet, {
+    Id: id,
+    Timestamp: new Date().toISOString(),
+    Date: m.date,
+    Player: m.player,
+    Metric: m.metric,
+    Value: m.value,
+  });
   return id;
 }
 
@@ -174,7 +194,7 @@ function doPost(e) {
   var result;
 
   if (body.action === "addPlayer") {
-    ensurePlayer_(body.name, body.position, body.photo);
+    ensurePlayer_(body.name, body.position, body.number);
     result = { ok: true };
   } else if (body.action === "updatePlayer") {
     var pSheet = playersSheet_();
@@ -182,9 +202,11 @@ function doPost(e) {
     if (pRow === -1) {
       result = { error: "player not found" };
     } else {
-      if (body.name !== undefined) pSheet.getRange(pRow, 2).setValue(body.name);
-      if (body.position !== undefined) pSheet.getRange(pRow, 3).setValue(body.position);
-      if (body.photo !== undefined) pSheet.getRange(pRow, 4).setValue(body.photo);
+      var pUpdates = {};
+      if (body.name !== undefined) pUpdates.Name = body.name;
+      if (body.number !== undefined) pUpdates.Number = body.number;
+      if (body.position !== undefined) pUpdates.Position = body.position;
+      setRowByHeaders_(pSheet, pRow, pUpdates);
       result = { ok: true };
     }
   } else if (body.action === "deletePlayer") {
@@ -213,13 +235,13 @@ function doPost(e) {
     if (eRow === -1) {
       result = { error: "entry not found" };
     } else {
-      if (body.date !== undefined) eSheet.getRange(eRow, 3).setValue(body.date);
-      if (body.player !== undefined) eSheet.getRange(eRow, 4).setValue(body.player);
-      if (body.sprintTimes !== undefined)
-        eSheet.getRange(eRow, 5).setValue(body.sprintTimes.join(","));
-      if (body.throwVelos !== undefined)
-        eSheet.getRange(eRow, 6).setValue(body.throwVelos.join(","));
-      if (body.notes !== undefined) eSheet.getRange(eRow, 7).setValue(body.notes);
+      var eUpdates = {};
+      if (body.date !== undefined) eUpdates.Date = body.date;
+      if (body.player !== undefined) eUpdates.Player = body.player;
+      if (body.sprintTimes !== undefined) eUpdates.SprintTimes = body.sprintTimes.join(",");
+      if (body.throwVelos !== undefined) eUpdates.ThrowVelos = body.throwVelos.join(",");
+      if (body.notes !== undefined) eUpdates.Notes = body.notes;
+      setRowByHeaders_(eSheet, eRow, eUpdates);
       result = { ok: true };
     }
   } else if (body.action === "deleteEntry") {
@@ -248,9 +270,11 @@ function doPost(e) {
       result = { error: "metric not found" };
     } else {
       var mS = metricsSheet_();
-      if (body.date !== undefined) mS.getRange(mRow, 3).setValue(body.date);
-      if (body.metric !== undefined) mS.getRange(mRow, 5).setValue(body.metric);
-      if (body.value !== undefined) mS.getRange(mRow, 6).setValue(body.value);
+      var mUpdates = {};
+      if (body.date !== undefined) mUpdates.Date = body.date;
+      if (body.metric !== undefined) mUpdates.Metric = body.metric;
+      if (body.value !== undefined) mUpdates.Value = body.value;
+      setRowByHeaders_(mS, mRow, mUpdates);
       result = { ok: true };
     }
   } else if (body.action === "deleteMetric") {

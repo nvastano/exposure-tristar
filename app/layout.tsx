@@ -46,7 +46,7 @@ export default function RootLayout({
               COACH ENTRY
             </Link>
             <Link href="/log" className="hover:text-accent transition-colors">
-              LOG STATS
+              PLAYER ENTRY
             </Link>
           </nav>
         </header>

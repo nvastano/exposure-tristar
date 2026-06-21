@@ -9,10 +9,15 @@ import type { RawMetricRow } from "@/lib/metrics";
 import { metricDef } from "@/lib/metrics";
 import PlayerCharts from "./PlayerCharts";
 
+type PlayerRow = { Id: string; Name: string; Number?: string };
+
 function PlayerContent() {
   const searchParams = useSearchParams();
   const playerName = searchParams.get("name") || "";
 
+  const [player, setPlayer] = useState<PlayerRow | null>(null);
+  const [editingNumber, setEditingNumber] = useState(false);
+  const [numberInput, setNumberInput] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -23,10 +28,15 @@ function PlayerContent() {
     if (!playerName) return;
     setLoading(true);
     try {
-      const [entries, metricRows] = await Promise.all([
+      const [players, entries, metricRows] = await Promise.all([
+        sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries", { player: playerName }) as Promise<RawEntryRow[]>,
         sheetsGet("metrics", { player: playerName }) as Promise<RawMetricRow[]>,
       ]);
+      const match = players.find(
+        (p) => p.Name.trim().toLowerCase() === playerName.trim().toLowerCase()
+      );
+      setPlayer(match || null);
       setSessions(normalizeSessions(entries));
       setMetrics(metricRows);
     } catch (err) {
@@ -34,6 +44,13 @@ function PlayerContent() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSaveNumber() {
+    if (!player) return;
+    await sheetsPost("updatePlayer", { id: player.Id, number: numberInput.trim() });
+    setEditingNumber(false);
+    load();
   }
 
   useEffect(() => {
@@ -88,7 +105,44 @@ function PlayerContent() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-wide">{playerName}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-wide">{playerName}</h1>
+          {editingNumber ? (
+            <>
+              <input
+                autoFocus
+                value={numberInput}
+                onChange={(e) => setNumberInput(e.target.value)}
+                placeholder="#"
+                className="bg-white/5 border border-accent/50 rounded px-2 py-1 text-sm w-16"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveNumber();
+                  if (e.key === "Escape") setEditingNumber(false);
+                }}
+              />
+              <button onClick={handleSaveNumber} className="text-accent text-sm hover:underline">
+                Save
+              </button>
+              <button
+                onClick={() => setEditingNumber(false)}
+                className="text-white/40 text-sm hover:text-white"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                setNumberInput(player?.Number || "");
+                setEditingNumber(true);
+              }}
+              className="text-white/40 hover:text-accent text-lg font-mono"
+              title="Edit jersey number"
+            >
+              {player?.Number ? `#${player.Number}` : "+ #"}
+            </button>
+          )}
+        </div>
         <p className="text-white/50 text-sm mt-1">Week-over-week progress</p>
       </div>
 

@@ -12,8 +12,6 @@ export default function LogPage() {
   const [players, setPlayers] = useState<string[]>([]);
   const [player, setPlayer] = useState("");
   const [date, setDate] = useState(TODAY);
-  const [sprintTimes, setSprintTimes] = useState("");
-  const [throwVelos, setThrowVelos] = useState("");
   const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -36,49 +34,25 @@ export default function LogPage() {
       return;
     }
 
-    const cleanSprints = sprintTimes
-      .split(",")
-      .map((s) => parseFloat(s.trim()))
-      .filter((n) => Number.isFinite(n) && n > 0);
-    const cleanThrows = throwVelos
-      .split(",")
-      .map((s) => parseFloat(s.trim()))
-      .filter((n) => Number.isFinite(n) && n > 0);
+    const metricEntries = METRIC_DEFS.filter((def) => {
+      const v = metricValues[def.key];
+      return def.type === "boolean" ? v === true : Boolean(v && String(v).trim());
+    }).map((def) => ({
+      date,
+      player,
+      metric: def.key,
+      value: def.type === "boolean" ? "yes" : String(metricValues[def.key]),
+    }));
+
+    if (!metricEntries.length) {
+      setStatus("Enter at least one stat before submitting.");
+      return;
+    }
 
     setSubmitting(true);
     try {
-      if (cleanSprints.length || cleanThrows.length) {
-        await sheetsPost("addEntry", {
-          date,
-          player,
-          sprintTimes: cleanSprints,
-          throwVelos: cleanThrows,
-        });
-      }
-
-      const metricEntries = METRIC_DEFS.filter((def) => {
-        const v = metricValues[def.key];
-        return def.type === "boolean" ? v === true : Boolean(v && String(v).trim());
-      }).map((def) => ({
-        date,
-        player,
-        metric: def.key,
-        value: def.type === "boolean" ? "yes" : String(metricValues[def.key]),
-      }));
-
-      if (metricEntries.length) {
-        await sheetsPost("bulkMetrics", { entries: metricEntries });
-      }
-
-      if (!cleanSprints.length && !cleanThrows.length && !metricEntries.length) {
-        setStatus("Enter at least one stat before submitting.");
-        setSubmitting(false);
-        return;
-      }
-
+      await sheetsPost("bulkMetrics", { entries: metricEntries });
       setStatus(`Saved your stats for ${date}!`);
-      setSprintTimes("");
-      setThrowVelos("");
       setMetricValues({});
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -90,7 +64,7 @@ export default function LogPage() {
   return (
     <div className="flex flex-col gap-6 max-w-xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-wide">LOG YOUR STATS</h1>
+        <h1 className="text-2xl font-bold tracking-wide">PLAYER ENTRY</h1>
         <p className="text-white/50 text-sm mt-1">
           Pick your name and fill in whatever you did today. Leave anything blank that doesn&apos;t apply.
         </p>
@@ -120,28 +94,6 @@ export default function LogPage() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        Sprint times — home to 1st, seconds (comma separated)
-        <input
-          type="text"
-          value={sprintTimes}
-          onChange={(e) => setSprintTimes(e.target.value)}
-          placeholder="4.53, 4.43, 4.78"
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        Throw velocities — 3rd to 1st, mph (comma separated)
-        <input
-          type="text"
-          value={throwVelos}
-          onChange={(e) => setThrowVelos(e.target.value)}
-          placeholder="50, 48"
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
