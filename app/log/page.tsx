@@ -100,7 +100,7 @@ export default function LogPage() {
       </label>
 
       <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
-        <span className="text-sm text-white/50">Other workouts today</span>
+        <span className="text-sm text-white/50">My Work Today</span>
         {METRIC_DEFS.map((def) =>
           def.type === "boolean" ? (
             <label key={def.key} className="flex items-center gap-2 text-sm">
