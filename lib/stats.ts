@@ -96,3 +96,41 @@ export function throwDelta(sessions: Session[]): number | null {
   if (!latest?.bestThrow || !prev?.bestThrow) return null;
   return latest.bestThrow - prev.bestThrow; // positive = improvement (harder throw)
 }
+
+export function practiceDates(byPlayer: Map<string, Session[]>): string[] {
+  const dates = new Set<string>();
+  for (const sessions of byPlayer.values()) {
+    for (const s of sessions) dates.add(s.date);
+  }
+  return Array.from(dates).sort((a, b) => b.localeCompare(a));
+}
+
+export function bestSprintOnDate(sessions: Session[], date: string): number | null {
+  return bestSprintEver(sessions.filter((s) => s.date === date));
+}
+
+export function bestThrowOnDate(sessions: Session[], date: string): number | null {
+  return bestThrowEver(sessions.filter((s) => s.date === date));
+}
+
+export function sprintDeltaOnDate(sessions: Session[], date: string): number | null {
+  const withSprint = sessions.filter((s) => s.bestSprint !== null);
+  const dates = Array.from(new Set(withSprint.map((s) => s.date))).sort();
+  const idx = dates.indexOf(date);
+  if (idx < 1) return null;
+  const current = bestSprintOnDate(sessions, date);
+  const previous = bestSprintOnDate(sessions, dates[idx - 1]);
+  if (current === null || previous === null) return null;
+  return current - previous;
+}
+
+export function throwDeltaOnDate(sessions: Session[], date: string): number | null {
+  const withThrow = sessions.filter((s) => s.bestThrow !== null);
+  const dates = Array.from(new Set(withThrow.map((s) => s.date))).sort();
+  const idx = dates.indexOf(date);
+  if (idx < 1) return null;
+  const current = bestThrowOnDate(sessions, date);
+  const previous = bestThrowOnDate(sessions, dates[idx - 1]);
+  if (current === null || previous === null) return null;
+  return current - previous;
+}

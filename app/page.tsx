@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { normalizeSessions, bestSprintEver, bestThrowEver, sprintDelta, throwDelta } from "@/lib/stats";
+import {
+  normalizeSessions,
+  practiceDates,
+  bestSprintOnDate,
+  bestThrowOnDate,
+  sprintDeltaOnDate,
+  throwDeltaOnDate,
+  formatDate,
+} from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
@@ -33,6 +41,7 @@ export default function Home() {
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
   const [showCoachEntry, setShowCoachEntry] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -49,6 +58,11 @@ export default function Home() {
         map.get(s.player)!.push(s);
       }
       setByPlayer(map);
+      setSelectedDate((prev) => {
+        const dates = practiceDates(map);
+        if (prev && dates.includes(prev)) return prev;
+        return dates[0] || null;
+      });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -113,7 +127,23 @@ export default function Home() {
             Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex items-end gap-2 shrink-0">
+          {selectedDate && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-white/50">Practice date</span>
+              <select
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              >
+                {practiceDates(byPlayer).map((d) => (
+                  <option key={d} value={d}>
+                    {formatDate(d)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             onClick={() => setShowCoachEntry(true)}
             className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
@@ -190,10 +220,10 @@ export default function Home() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {players.map((player) => {
           const sessions = byPlayer.get(player.Name) || [];
-          const bestSprint = bestSprintEver(sessions);
-          const bestThrow = bestThrowEver(sessions);
-          const sDelta = sprintDelta(sessions);
-          const tDelta = throwDelta(sessions);
+          const bestSprint = selectedDate ? bestSprintOnDate(sessions, selectedDate) : null;
+          const bestThrow = selectedDate ? bestThrowOnDate(sessions, selectedDate) : null;
+          const sDelta = selectedDate ? sprintDeltaOnDate(sessions, selectedDate) : null;
+          const tDelta = selectedDate ? throwDeltaOnDate(sessions, selectedDate) : null;
 
           return (
             <div
@@ -255,7 +285,7 @@ export default function Home() {
                   </span>
                 </div>
                 {sDelta !== null && (
-                  <DeltaBadge value={sDelta} betterWhenNegative label="vs last session" unit="s" />
+                  <DeltaBadge value={sDelta} betterWhenNegative label="vs last practice" unit="s" />
                 )}
 
                 <div className="flex justify-between text-sm">
@@ -265,11 +295,11 @@ export default function Home() {
                   </span>
                 </div>
                 {tDelta !== null && (
-                  <DeltaBadge value={tDelta} betterWhenNegative={false} label="vs last session" unit=" mph" />
+                  <DeltaBadge value={tDelta} betterWhenNegative={false} label="vs last practice" unit=" mph" />
                 )}
 
-                {sessions.length === 0 && (
-                  <span className="text-white/30 text-xs">No sessions logged yet</span>
+                {bestSprint === null && bestThrow === null && (
+                  <span className="text-white/30 text-xs">No stats logged for this practice</span>
                 )}
               </Link>
             </div>
@@ -277,7 +307,9 @@ export default function Home() {
         })}
       </div>
 
-      {players.length > 0 && <PracticeLeaderboard players={players} byPlayer={byPlayer} />}
+      {players.length > 0 && (
+        <PracticeLeaderboard players={players} byPlayer={byPlayer} date={selectedDate} />
+      )}
     </div>
   );
 }

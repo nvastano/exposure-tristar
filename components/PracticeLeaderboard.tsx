@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -11,7 +11,6 @@ import {
   YAxis,
 } from "recharts";
 import type { Session } from "@/lib/stats";
-import { formatDate } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
@@ -25,21 +24,12 @@ type LeaderboardRow = {
 export default function PracticeLeaderboard({
   players,
   byPlayer,
+  date,
 }: {
   players: PlayerRow[];
   byPlayer: Map<string, Session[]>;
+  date: string | null;
 }) {
-  const dates = useMemo(() => {
-    const set = new Set<string>();
-    for (const sessions of byPlayer.values()) {
-      for (const s of sessions) set.add(s.date);
-    }
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [byPlayer]);
-
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const date = selectedDate ?? dates[0] ?? null;
-
   const rows: LeaderboardRow[] = useMemo(() => {
     if (!date) return [];
     return players.map((player) => {
@@ -68,23 +58,7 @@ export default function PracticeLeaderboard({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-xl font-bold tracking-wide">PRACTICE LEADERBOARD</h2>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-white/50">Practice date</span>
-          <select
-            value={date}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded px-3 py-2"
-          >
-            {dates.map((d) => (
-              <option key={d} value={d}>
-                {formatDate(d)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <h2 className="text-xl font-bold tracking-wide">PRACTICE LEADERBOARD</h2>
 
       <div className="grid sm:grid-cols-2 gap-6">
         <div className="rounded-lg border border-white/10 p-4">
