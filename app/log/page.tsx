@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { METRIC_DEFS } from "@/lib/metrics";
+import { METRIC_CATEGORIES, METRIC_DEFS } from "@/lib/metrics";
 import { localDateStr } from "@/lib/stats";
 
 const TODAY = localDateStr();
@@ -99,36 +99,45 @@ export default function LogPage() {
         />
       </label>
 
-      <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+      <div className="flex flex-col gap-6 border-t border-white/10 pt-4">
         <span className="text-sm text-white/50">My Work Today</span>
-        {METRIC_DEFS.map((def) =>
-          def.type === "boolean" ? (
-            <label key={def.key} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={metricValues[def.key] === true}
-                onChange={(e) =>
-                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
-                }
-                className="w-4 h-4"
-              />
-              {def.label}
-            </label>
-          ) : (
-            <label key={def.key} className="flex flex-col gap-1 text-sm">
-              {def.label}
-              {def.unit && <span className="text-white/30 text-xs">{def.unit}</span>}
-              <input
-                type="number"
-                value={(metricValues[def.key] as string) || ""}
-                onChange={(e) =>
-                  setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
-                }
-                className="bg-white/5 border border-white/10 rounded px-3 py-2 w-32"
-              />
-            </label>
-          )
-        )}
+        {METRIC_CATEGORIES.map((category) => {
+          const defs = METRIC_DEFS.filter((def) => def.category === category);
+          if (!defs.length) return null;
+          return (
+            <div key={category} className="flex flex-col gap-3">
+              <span className="text-xs font-semibold tracking-wide text-accent">{category}</span>
+              {defs.map((def) =>
+                def.type === "boolean" ? (
+                  <label key={def.key} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={metricValues[def.key] === true}
+                      onChange={(e) =>
+                        setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
+                      }
+                      className="w-4 h-4"
+                    />
+                    {def.label}
+                  </label>
+                ) : (
+                  <label key={def.key} className="flex flex-col gap-1 text-sm">
+                    {def.label}
+                    {def.unit && <span className="text-white/30 text-xs">{def.unit}</span>}
+                    <input
+                      type="number"
+                      value={(metricValues[def.key] as string) || ""}
+                      onChange={(e) =>
+                        setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
+                      }
+                      className="bg-white/5 border border-white/10 rounded px-3 py-2 w-32"
+                    />
+                  </label>
+                )
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <button

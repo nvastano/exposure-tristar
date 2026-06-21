@@ -1,19 +1,28 @@
 export type MetricType = "number" | "boolean";
 
+export type MetricCategory = "Strength" | "Hitting" | "Throwing";
+
 export type MetricDef = {
   key: string;
   label: string;
   unit?: string;
   type: MetricType;
+  category: MetricCategory;
 };
 
 // Add new trackable stats here as they come up — no backend changes needed,
 // the Metrics sheet stores {player, date, metric: key, value} generically.
+export const METRIC_CATEGORIES: MetricCategory[] = ["Strength", "Hitting", "Throwing"];
+
 export const METRIC_DEFS: MetricDef[] = [
-  { key: "buckets", label: "Buckets of balls hit", type: "number" },
-  { key: "pushups", label: "Push-ups", type: "number" },
-  { key: "situps", label: "Sit-ups", type: "number" },
-  { key: "playedCatch", label: "Played catch today", type: "boolean" },
+  { key: "pushups", label: "Push-ups", type: "number", category: "Strength" },
+  { key: "situps", label: "Sit-Ups", type: "number", category: "Strength" },
+  { key: "teeWork", label: "Tee Work", type: "boolean", category: "Hitting" },
+  { key: "livePb", label: "Live PB", type: "boolean", category: "Hitting" },
+  { key: "frontToss", label: "Front Toss", type: "boolean", category: "Hitting" },
+  { key: "longToss", label: "Long Toss", type: "boolean", category: "Throwing" },
+  { key: "pitching", label: "Pitching", type: "boolean", category: "Throwing" },
+  { key: "fielding", label: "Fielding", type: "boolean", category: "Throwing" },
 ];
 
 export function metricDef(key: string): MetricDef | undefined {
