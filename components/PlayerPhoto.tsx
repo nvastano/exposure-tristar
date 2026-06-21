@@ -1,14 +1,22 @@
+"use client";
+
+import { useState } from "react";
+
 const BASE_PATH = "/exposure-tristar";
 
+function slugifyName(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
 export default function PlayerPhoto({
-  photo,
   name,
   size = 56,
 }: {
-  photo?: string;
   name: string;
   size?: number;
 }) {
+  const [failed, setFailed] = useState(false);
+
   const initials = name
     .split(" ")
     .map((p) => p[0])
@@ -17,16 +25,17 @@ export default function PlayerPhoto({
     .join("")
     .toUpperCase();
 
-  if (photo) {
+  if (!failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`${BASE_PATH}/players/${photo}`}
+        src={`${BASE_PATH}/players/${slugifyName(name)}.jpg`}
         alt={name}
         width={size}
         height={size}
         style={{ width: size, height: size }}
         className="rounded-full object-cover border border-white/10 flex-shrink-0"
+        onError={() => setFailed(true)}
       />
     );
   }

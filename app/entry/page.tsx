@@ -13,7 +13,6 @@ export default function EntryPage() {
   const [players, setPlayers] = useState<string[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [newPlayerPhoto, setNewPlayerPhoto] = useState("");
   const [date, setDate] = useState(TODAY);
   const [sprintTimes, setSprintTimes] = useState<string[]>([""]);
   const [throwVelos, setThrowVelos] = useState<string[]>([""]);
@@ -83,9 +82,6 @@ export default function EntryPage() {
 
     setSubmitting(true);
     try {
-      if (isNewPlayer && newPlayerPhoto.trim()) {
-        await sheetsPost("addPlayer", { name: playerName, photo: newPlayerPhoto.trim() });
-      }
       if (cleanSprints.length || cleanThrows.length) {
         await sheetsPost("addEntry", {
           date,
@@ -107,7 +103,6 @@ export default function EntryPage() {
         setPlayers((prev) => [...prev, playerName]);
         setSelectedPlayer(playerName);
         setNewPlayerName("");
-        setNewPlayerPhoto("");
       }
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -153,16 +148,6 @@ export default function EntryPage() {
               value={newPlayerName}
               onChange={(e) => setNewPlayerName(e.target.value)}
               placeholder="e.g. Cafrey"
-              className="bg-white/5 border border-white/10 rounded px-3 py-2"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Photo filename (optional)
-            <input
-              type="text"
-              value={newPlayerPhoto}
-              onChange={(e) => setNewPlayerPhoto(e.target.value)}
-              placeholder="e.g. hudson-vastano.jpg (drop the file in public/players/)"
               className="bg-white/5 border border-white/10 rounded px-3 py-2"
             />
           </label>
