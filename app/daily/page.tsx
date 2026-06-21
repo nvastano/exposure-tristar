@@ -5,6 +5,7 @@ import { sheetsGet } from "@/lib/sheets";
 import type { RawMetricRow } from "@/lib/metrics";
 import DailyDigest from "@/components/DailyDigest";
 import PlayerEntryForm from "@/components/PlayerEntryForm";
+import Modal from "@/components/Modal";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 
@@ -13,6 +14,7 @@ export default function DailyPage() {
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEntry, setShowEntry] = useState(false);
 
   async function refresh() {
     try {
@@ -48,8 +50,25 @@ export default function DailyPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <PlayerEntryForm onSaved={refresh} />
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowEntry(true)}
+          className="shrink-0 bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+        >
+          + Player Entry
+        </button>
+      </div>
+
       <DailyDigest players={players} metrics={metrics} />
+
+      <Modal open={showEntry} onClose={() => setShowEntry(false)}>
+        <PlayerEntryForm
+          onSaved={() => {
+            refresh();
+            setShowEntry(false);
+          }}
+        />
+      </Modal>
     </div>
   );
 }

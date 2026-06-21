@@ -8,6 +8,7 @@ import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
 import CoachEntryForm from "@/components/CoachEntryForm";
+import Modal from "@/components/Modal";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
 
@@ -31,6 +32,7 @@ export default function Home() {
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
+  const [showCoachEntry, setShowCoachEntry] = useState(false);
 
   async function refresh() {
     setLoading(true);
@@ -111,14 +113,22 @@ export default function Home() {
             Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
           </p>
         </div>
-        {!addingPlayer && (
+        <div className="flex gap-2 shrink-0">
           <button
-            onClick={() => setAddingPlayer(true)}
-            className="shrink-0 bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+            onClick={() => setShowCoachEntry(true)}
+            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
           >
-            + Add Player
+            + Coach Entry
           </button>
-        )}
+          {!addingPlayer && (
+            <button
+              onClick={() => setAddingPlayer(true)}
+              className="bg-white/10 hover:bg-white/20 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+            >
+              + Add Player
+            </button>
+          )}
+        </div>
       </div>
 
       {addingPlayer && (
@@ -169,7 +179,9 @@ export default function Home() {
         </div>
       )}
 
-      <CoachEntryForm onSaved={refresh} />
+      <Modal open={showCoachEntry} onClose={() => setShowCoachEntry(false)}>
+        <CoachEntryForm onSaved={refresh} />
+      </Modal>
 
       {players.length === 0 && (
         <p className="text-white/50 text-sm">No players yet. Add one above to get started.</p>

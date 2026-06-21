@@ -73,7 +73,7 @@ export default function CoachEntryForm({ onSaved }: { onSaved?: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-xl rounded-lg border border-white/10 p-5">
+    <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-xl font-bold tracking-wide">COACH ENTRY</h2>
         <p className="text-white/50 text-sm mt-1">
