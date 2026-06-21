@@ -24,7 +24,7 @@ export default function EntryPage() {
     (async () => {
       try {
         const data = (await sheetsGet("players")) as PlayerRow[];
-        setPlayers(data.map((p) => p.Name).filter(Boolean));
+        setPlayers(data.map((p) => p.Name).filter(Boolean).sort((a, b) => a.localeCompare(b)));
       } catch {
         // sheet not connected yet; player list just stays empty
       }
