@@ -7,7 +7,7 @@ import { normalizeSessions, latestSession, sprintDelta, throwDelta } from "@/lib
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 
-type PlayerRow = { Id: string; Name: string; Position?: string; Photo?: string };
+type PlayerRow = { Id: string; Name: string; Position?: string };
 
 export default function Home() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -103,7 +103,7 @@ export default function Home() {
               className="rounded-lg border border-white/10 p-5 hover:border-accent/60 transition-colors flex flex-col gap-3 relative"
             >
               <div className="flex items-center gap-3">
-                <PlayerPhoto photo={player.Photo} name={player.Name} />
+                <PlayerPhoto name={player.Name} />
                 <div className="flex-1 min-w-0">
                   {editing === player.Id ? (
                     <input
