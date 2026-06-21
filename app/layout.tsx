@@ -35,7 +35,7 @@ export default function RootLayout({
             <Logo size={48} />
             <div className="flex flex-col leading-tight">
               <span className="text-lg font-bold tracking-wide">EXPOSURE TRISTAR BASEBALL</span>
-              <span className="text-xs text-white/50">Speed &amp; Arm Strength Tracker</span>
+              <span className="text-xs text-white/50">Player Development Tracker</span>
             </div>
           </Link>
           <nav className="flex items-center gap-5 text-sm font-semibold tracking-wide">
