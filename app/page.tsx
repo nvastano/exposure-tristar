@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { normalizeSessions, latestSession, sprintDelta, throwDelta } from "@/lib/stats";
+import { normalizeSessions, bestSprintEver, bestThrowEver, sprintDelta, throwDelta } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 
@@ -174,7 +174,8 @@ export default function Home() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {players.map((player) => {
           const sessions = byPlayer.get(player.Name) || [];
-          const latest = latestSession(sessions);
+          const bestSprint = bestSprintEver(sessions);
+          const bestThrow = bestThrowEver(sessions);
           const sDelta = sprintDelta(sessions);
           const tDelta = throwDelta(sessions);
 
@@ -234,7 +235,7 @@ export default function Home() {
                 <div className="flex justify-between text-sm">
                   <span className="text-white/50">Best sprint (home–1st)</span>
                   <span className="font-mono">
-                    {latest?.bestSprint ? `${latest.bestSprint.toFixed(2)}s` : "—"}
+                    {bestSprint ? `${bestSprint.toFixed(2)}s` : "—"}
                   </span>
                 </div>
                 {sDelta !== null && (
@@ -244,7 +245,7 @@ export default function Home() {
                 <div className="flex justify-between text-sm">
                   <span className="text-white/50">Best throw (3rd–1st)</span>
                   <span className="font-mono">
-                    {latest?.bestThrow ? `${latest.bestThrow.toFixed(0)} mph` : "—"}
+                    {bestThrow ? `${bestThrow.toFixed(0)} mph` : "—"}
                   </span>
                 </div>
                 {tDelta !== null && (

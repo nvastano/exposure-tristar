@@ -68,16 +68,31 @@ export function previousSession(sessions: Session[]): Session | null {
   return sessions.length > 1 ? sessions[sessions.length - 2] : null;
 }
 
+// A "session" row now only carries one stat type at a time (coach entries are
+// logged one value at a time), so the overall best has to be the min/max
+// across all rows rather than just the most recent row's value.
+export function bestSprintEver(sessions: Session[]): number | null {
+  const vals = sessions.map((s) => s.bestSprint).filter((n): n is number => n !== null);
+  return vals.length ? Math.min(...vals) : null;
+}
+
+export function bestThrowEver(sessions: Session[]): number | null {
+  const vals = sessions.map((s) => s.bestThrow).filter((n): n is number => n !== null);
+  return vals.length ? Math.max(...vals) : null;
+}
+
 export function sprintDelta(sessions: Session[]): number | null {
-  const latest = latestSession(sessions);
-  const prev = previousSession(sessions);
+  const withSprint = sessions.filter((s) => s.bestSprint !== null);
+  const latest = withSprint[withSprint.length - 1];
+  const prev = withSprint[withSprint.length - 2];
   if (!latest?.bestSprint || !prev?.bestSprint) return null;
   return latest.bestSprint - prev.bestSprint; // negative = improvement (faster)
 }
 
 export function throwDelta(sessions: Session[]): number | null {
-  const latest = latestSession(sessions);
-  const prev = previousSession(sessions);
+  const withThrow = sessions.filter((s) => s.bestThrow !== null);
+  const latest = withThrow[withThrow.length - 1];
+  const prev = withThrow[withThrow.length - 2];
   if (!latest?.bestThrow || !prev?.bestThrow) return null;
   return latest.bestThrow - prev.bestThrow; // positive = improvement (harder throw)
 }
