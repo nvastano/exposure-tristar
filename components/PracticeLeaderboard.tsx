@@ -95,7 +95,7 @@ export default function PracticeLeaderboard({
             <ResponsiveContainer width="100%" height={Math.max(200, sprintChartData.length * 36)}>
               <BarChart data={sprintChartData} layout="vertical" margin={{ left: 16 }}>
                 <CartesianGrid stroke="#ffffff1a" />
-                <XAxis type="number" stroke="#ffffff66" fontSize={12} domain={["auto", "auto"]} />
+                <XAxis type="number" stroke="#ffffff66" fontSize={12} domain={[0, "auto"]} />
                 <YAxis type="category" dataKey="name" stroke="#ffffff66" fontSize={12} width={110} />
                 <Tooltip
                   contentStyle={{ background: "#111", border: "1px solid #333" }}
@@ -118,7 +118,7 @@ export default function PracticeLeaderboard({
             <ResponsiveContainer width="100%" height={Math.max(200, throwChartData.length * 36)}>
               <BarChart data={throwChartData} layout="vertical" margin={{ left: 16 }}>
                 <CartesianGrid stroke="#ffffff1a" />
-                <XAxis type="number" stroke="#ffffff66" fontSize={12} domain={["auto", "auto"]} />
+                <XAxis type="number" stroke="#ffffff66" fontSize={12} domain={[0, "auto"]} />
                 <YAxis type="category" dataKey="name" stroke="#ffffff66" fontSize={12} width={110} />
                 <Tooltip
                   contentStyle={{ background: "#111", border: "1px solid #333" }}
