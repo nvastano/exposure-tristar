@@ -7,6 +7,7 @@ import { normalizeSessions, bestSprintEver, bestThrowEver, sprintDelta, throwDel
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
+import CoachEntryForm from "@/components/CoachEntryForm";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
 
@@ -168,8 +169,10 @@ export default function Home() {
         </div>
       )}
 
+      <CoachEntryForm onSaved={refresh} />
+
       {players.length === 0 && (
-        <p className="text-white/50 text-sm">No players yet. Add data on the Coach Entry page.</p>
+        <p className="text-white/50 text-sm">No players yet. Add one above to get started.</p>
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

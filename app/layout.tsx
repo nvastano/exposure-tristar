@@ -39,17 +39,11 @@ export default function RootLayout({
             </div>
           </Link>
           <nav className="flex items-center gap-5 text-sm font-semibold tracking-wide">
-            <Link href="/" className="hover:text-accent transition-colors">
-              PRACTICE STATS
-            </Link>
             <Link href="/daily" className="hover:text-accent transition-colors">
               DAILY WORK
             </Link>
-            <Link href="/entry" className="hover:text-accent transition-colors">
-              COACH ENTRY
-            </Link>
-            <Link href="/log" className="hover:text-accent transition-colors">
-              PLAYER ENTRY
+            <Link href="/" className="hover:text-accent transition-colors">
+              PRACTICE STATS
             </Link>
           </nav>
         </header>

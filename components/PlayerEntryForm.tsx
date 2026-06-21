@@ -9,7 +9,7 @@ const TODAY = localDateStr();
 
 type PlayerRow = { Name: string };
 
-export default function LogPage() {
+export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
   const [player, setPlayer] = useState("");
   const [date, setDate] = useState(TODAY);
@@ -55,6 +55,7 @@ export default function LogPage() {
       await sheetsPost("bulkMetrics", { entries: metricEntries });
       setStatus(`Saved your stats for ${date}!`);
       setMetricValues({});
+      onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
     } finally {
@@ -63,9 +64,9 @@ export default function LogPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-xl">
+    <div className="flex flex-col gap-6 max-w-xl rounded-lg border border-white/10 p-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-wide">PLAYER ENTRY</h1>
+        <h2 className="text-xl font-bold tracking-wide">PLAYER ENTRY</h2>
         <p className="text-white/50 text-sm mt-1">
           Pick your name and fill in whatever you did today. Leave anything blank that doesn&apos;t apply.
         </p>

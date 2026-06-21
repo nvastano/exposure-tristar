@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { sheetsGet } from "@/lib/sheets";
 import type { RawMetricRow } from "@/lib/metrics";
 import DailyDigest from "@/components/DailyDigest";
+import PlayerEntryForm from "@/components/PlayerEntryForm";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 
@@ -13,21 +14,23 @@ export default function DailyPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function refresh() {
+    try {
+      const [playersData, metricsData] = await Promise.all([
+        sheetsGet("players") as Promise<PlayerRow[]>,
+        sheetsGet("metrics") as Promise<RawMetricRow[]>,
+      ]);
+      setPlayers(playersData);
+      setMetrics(metricsData);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      try {
-        const [playersData, metricsData] = await Promise.all([
-          sheetsGet("players") as Promise<PlayerRow[]>,
-          sheetsGet("metrics") as Promise<RawMetricRow[]>,
-        ]);
-        setPlayers(playersData);
-        setMetrics(metricsData);
-      } catch (err) {
-        setError((err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    refresh();
   }, []);
 
   if (loading) {
@@ -43,5 +46,10 @@ export default function DailyPage() {
     );
   }
 
-  return <DailyDigest players={players} metrics={metrics} />;
+  return (
+    <div className="flex flex-col gap-8">
+      <PlayerEntryForm onSaved={refresh} />
+      <DailyDigest players={players} metrics={metrics} />
+    </div>
+  );
 }

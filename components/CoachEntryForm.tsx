@@ -10,7 +10,7 @@ const NEW_PLAYER = "__new__";
 type StatType = "sprint" | "throw";
 type PlayerRow = { Name: string };
 
-export default function EntryPage() {
+export default function CoachEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [newPlayerName, setNewPlayerName] = useState("");
@@ -60,10 +60,11 @@ export default function EntryPage() {
       setStatus(`Logged ${num} for ${playerName}.`);
       setValue("");
       if (isNewPlayer) {
-        setPlayers((prev) => [...prev, playerName]);
+        setPlayers((prev) => [...prev, playerName].sort((a, b) => a.localeCompare(b)));
         setNewPlayerName("");
       }
       setSelectedPlayer("");
+      onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
     } finally {
@@ -72,9 +73,9 @@ export default function EntryPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-xl">
+    <div className="flex flex-col gap-6 max-w-xl rounded-lg border border-white/10 p-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-wide">COACH ENTRY</h1>
+        <h2 className="text-xl font-bold tracking-wide">COACH ENTRY</h2>
         <p className="text-white/50 text-sm mt-1">
           Select a player, enter one sprint time or throw velocity, and save. Repeat for each player as
           they go through the drill.

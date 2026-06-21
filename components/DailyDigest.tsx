@@ -41,7 +41,7 @@ export default function DailyDigest({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-wide">DAILY DIGEST</h2>
+          <h2 className="text-xl font-bold tracking-wide">DAILY WORK</h2>
           <p className="text-white/50 text-sm mt-1">
             What the team is doing on their own — log your work and cheer each other on.
           </p>
