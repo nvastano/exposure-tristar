@@ -5,10 +5,8 @@ import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { normalizeSessions, bestSprintEver, bestThrowEver, sprintDelta, throwDelta } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
-import type { RawMetricRow } from "@/lib/metrics";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
-import DailyDigest from "@/components/DailyDigest";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
 
@@ -26,7 +24,6 @@ function sortByNumber(players: PlayerRow[]): PlayerRow[] {
 export default function Home() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [byPlayer, setByPlayer] = useState<Map<string, Session[]>>(new Map());
-  const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
@@ -37,10 +34,9 @@ export default function Home() {
   async function refresh() {
     setLoading(true);
     try {
-      const [playersData, entriesData, metricsData] = await Promise.all([
+      const [playersData, entriesData] = await Promise.all([
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries") as Promise<RawEntryRow[]>,
-        sheetsGet("metrics") as Promise<RawMetricRow[]>,
       ]);
       setPlayers(sortByNumber(playersData));
       const map = new Map<string, Session[]>();
@@ -50,7 +46,6 @@ export default function Home() {
         map.get(s.player)!.push(s);
       }
       setByPlayer(map);
-      setMetrics(metricsData);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -110,7 +105,7 @@ export default function Home() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-wide">TEAM DASHBOARD</h1>
+          <h1 className="text-2xl font-bold tracking-wide">PRACTICE STATS</h1>
           <p className="text-white/50 text-sm mt-1">
             Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
           </p>
@@ -266,8 +261,6 @@ export default function Home() {
           );
         })}
       </div>
-
-      {players.length > 0 && <DailyDigest players={players} metrics={metrics} />}
 
       {players.length > 0 && <PracticeLeaderboard players={players} byPlayer={byPlayer} />}
     </div>
