@@ -6,6 +6,7 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { normalizeSessions, bestSprintEver, bestThrowEver, sprintDelta, throwDelta } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
+import PracticeLeaderboard from "@/components/PracticeLeaderboard";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
 
@@ -260,6 +261,8 @@ export default function Home() {
           );
         })}
       </div>
+
+      {players.length > 0 && <PracticeLeaderboard players={players} byPlayer={byPlayer} />}
     </div>
   );
 }
