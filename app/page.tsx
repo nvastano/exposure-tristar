@@ -26,6 +26,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
+  const [addingPlayer, setAddingPlayer] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newNumber, setNewNumber] = useState("");
 
   async function refresh() {
     setLoading(true);
@@ -71,6 +74,15 @@ export default function Home() {
     refresh();
   }
 
+  async function handleAddPlayer() {
+    if (!newName.trim()) return;
+    await sheetsPost("addPlayer", { name: newName.trim(), number: newNumber.trim() });
+    setNewName("");
+    setNewNumber("");
+    setAddingPlayer(false);
+    refresh();
+  }
+
   if (loading) {
     return <p className="text-white/50 text-sm">Loading...</p>;
   }
@@ -90,12 +102,70 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-wide">TEAM DASHBOARD</h1>
-        <p className="text-white/50 text-sm mt-1">
-          Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-wide">TEAM DASHBOARD</h1>
+          <p className="text-white/50 text-sm mt-1">
+            Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
+          </p>
+        </div>
+        {!addingPlayer && (
+          <button
+            onClick={() => setAddingPlayer(true)}
+            className="shrink-0 bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+          >
+            + Add Player
+          </button>
+        )}
       </div>
+
+      {addingPlayer && (
+        <div className="rounded-lg border border-white/10 p-4 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            Name
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Cafrey Grizzle"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddPlayer();
+                if (e.key === "Escape") setAddingPlayer(false);
+              }}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm w-24">
+            Number
+            <input
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value)}
+              placeholder="#"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddPlayer();
+                if (e.key === "Escape") setAddingPlayer(false);
+              }}
+            />
+          </label>
+          <button
+            onClick={handleAddPlayer}
+            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => {
+              setAddingPlayer(false);
+              setNewName("");
+              setNewNumber("");
+            }}
+            className="text-white/40 hover:text-white text-sm px-2 py-2"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {players.length === 0 && (
         <p className="text-white/50 text-sm">No players yet. Add data on the Coach Entry page.</p>
