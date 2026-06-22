@@ -14,6 +14,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [player, setPlayer] = useState("");
   const [date, setDate] = useState(TODAY);
   const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
+  const [other, setOther] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -45,6 +46,10 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       value: def.type === "boolean" ? "yes" : String(metricValues[def.key]),
     }));
 
+    if (other.trim()) {
+      metricEntries.push({ date, player, metric: "Other", value: other.trim() });
+    }
+
     if (!metricEntries.length) {
       setStatus("Enter at least one stat before submitting.");
       return;
@@ -55,6 +60,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       await sheetsPost("bulkMetrics", { entries: metricEntries });
       setStatus(`Saved your stats for ${date}!`);
       setMetricValues({});
+      setOther("");
       onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -139,6 +145,19 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
             </div>
           );
         })}
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-xs font-semibold tracking-wide text-accent">Other</span>
+          <span className="text-white/30 text-xs">
+            Anything you did that&apos;s not listed above
+          </span>
+          <textarea
+            value={other}
+            onChange={(e) => setOther(e.target.value)}
+            rows={3}
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+          />
+        </label>
       </div>
 
       <button
