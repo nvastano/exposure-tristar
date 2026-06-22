@@ -14,17 +14,27 @@ var METRICS_SHEET = "Metrics";
 // No-op (silently) if the property isn't set, so this never blocks saves.
 function notifyGroupMe_(text) {
   var botId = PropertiesService.getScriptProperties().getProperty("GROUPME_BOT_ID");
-  if (!botId) return;
+  if (!botId) {
+    Logger.log("notifyGroupMe_: no GROUPME_BOT_ID script property set, skipping");
+    return;
+  }
   try {
-    UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", {
+    var resp = UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", {
       method: "post",
       contentType: "application/json",
       payload: JSON.stringify({ bot_id: botId, text: text }),
       muteHttpExceptions: true,
     });
+    Logger.log("notifyGroupMe_: status=" + resp.getResponseCode() + " body=" + resp.getContentText());
   } catch (err) {
-    // Never let a notification failure break the actual save.
+    Logger.log("notifyGroupMe_: error " + err);
   }
+}
+
+// Run this manually from the Apps Script editor (select function, click Run)
+// to test the GroupMe bot in isolation and trigger any auth prompts.
+function testGroupMeNotify() {
+  notifyGroupMe_("Test message from Apps Script 🧪");
 }
 
 function getSheet_(name, headers) {
