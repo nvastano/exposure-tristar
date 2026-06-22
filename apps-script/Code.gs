@@ -18,11 +18,14 @@ function notifyGroupMe_(text) {
     Logger.log("notifyGroupMe_: no GROUPME_BOT_ID script property set, skipping");
     return;
   }
+  botId = botId.trim();
+  var payload = JSON.stringify({ bot_id: botId, text: text });
+  Logger.log("notifyGroupMe_: botId=[" + botId + "] payload=" + payload);
   try {
     var resp = UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", {
       method: "post",
       contentType: "application/json",
-      payload: JSON.stringify({ bot_id: botId, text: text }),
+      payload: payload,
       muteHttpExceptions: true,
     });
     Logger.log("notifyGroupMe_: status=" + resp.getResponseCode() + " body=" + resp.getContentText());
