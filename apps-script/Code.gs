@@ -9,6 +9,24 @@ var PLAYERS_SHEET = "Players";
 var ENTRIES_SHEET = "Entries";
 var METRICS_SHEET = "Metrics";
 
+// Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
+// Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
+// No-op (silently) if the property isn't set, so this never blocks saves.
+function notifyGroupMe_(text) {
+  var botId = PropertiesService.getScriptProperties().getProperty("GROUPME_BOT_ID");
+  if (!botId) return;
+  try {
+    UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ bot_id: botId, text: text }),
+      muteHttpExceptions: true,
+    });
+  } catch (err) {
+    // Never let a notification failure break the actual save.
+  }
+}
+
 function getSheet_(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(name);
@@ -271,6 +289,9 @@ function doPost(e) {
       ensurePlayer_(m.player);
       appendMetric_(mSheet, m);
     });
+    if (body.entries.length) {
+      notifyGroupMe_(body.entries[0].player + " just logged their Daily Work 💪");
+    }
     result = { ok: true, count: body.entries.length };
   } else if (body.action === "updateMetric") {
     var mRow = findRowById_(metricsSheet_(), body.id);
