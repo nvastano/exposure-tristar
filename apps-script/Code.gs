@@ -19,13 +19,11 @@ function notifyGroupMe_(text) {
     return;
   }
   botId = botId.trim();
-  var payload = JSON.stringify({ bot_id: botId, text: text });
-  Logger.log("notifyGroupMe_: botId=[" + botId + "] payload=" + payload);
+  Logger.log("notifyGroupMe_: botId=[" + botId + "] text=" + text);
   try {
     var resp = UrlFetchApp.fetch("https://api.groupme.com/v3/bots/post", {
       method: "post",
-      contentType: "application/json",
-      payload: payload,
+      payload: { bot_id: botId, text: text },
       muteHttpExceptions: true,
     });
     Logger.log("notifyGroupMe_: status=" + resp.getResponseCode() + " body=" + resp.getContentText());
