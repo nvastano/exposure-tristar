@@ -40,13 +40,13 @@ export default function RootLayout({
           </Link>
           <nav className="flex items-center gap-5 text-sm font-semibold tracking-wide">
             <Link href="/" className="hover:text-accent transition-colors">
+              DRILLS
+            </Link>
+            <Link href="/daily-work" className="hover:text-accent transition-colors">
               DAILY WORK
             </Link>
             <Link href="/practice" className="hover:text-accent transition-colors">
               PRACTICE STATS
-            </Link>
-            <Link href="/drills" className="hover:text-accent transition-colors">
-              DRILLS
             </Link>
           </nav>
         </header>
