@@ -312,7 +312,10 @@ function doPost(e) {
       appendMetric_(mSheet, m);
     });
     if (body.entries.length) {
-      notifyGroupMe_(body.entries[0].player + " just logged their Daily Work 💪");
+      notifyGroupMe_(
+        body.entries[0].player +
+          " just logged their Daily Work 💪\nLog yours too here: http://bit.ly/3SK1EK6"
+      );
     }
     result = { ok: true, count: body.entries.length };
   } else if (body.action === "updateMetric") {
