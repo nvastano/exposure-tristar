@@ -8,6 +8,7 @@ import { localDateStr } from "@/lib/stats";
 const TODAY = localDateStr();
 
 type PlayerRow = { Name: string };
+type DrillRow = { Id: string; Name: string };
 
 export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
@@ -15,6 +16,8 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [date, setDate] = useState(TODAY);
   const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
   const [other, setOther] = useState("");
+  const [drills, setDrills] = useState<DrillRow[]>([]);
+  const [drillsDone, setDrillsDone] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,6 +26,14 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       try {
         const data = (await sheetsGet("players")) as PlayerRow[];
         setPlayers(data.map((p) => p.Name).filter(Boolean).sort((a, b) => a.localeCompare(b)));
+      } catch {
+        // sheet not connected yet
+      }
+    })();
+    (async () => {
+      try {
+        const data = (await sheetsGet("drills")) as DrillRow[];
+        setDrills(data);
       } catch {
         // sheet not connected yet
       }
@@ -50,6 +61,12 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       metricEntries.push({ date, player, metric: "Other", value: other.trim() });
     }
 
+    drills
+      .filter((d) => drillsDone[d.Id])
+      .forEach((d) => {
+        metricEntries.push({ date, player, metric: "Drill", value: d.Name });
+      });
+
     if (!metricEntries.length) {
       setStatus("Enter at least one stat before submitting.");
       return;
@@ -61,6 +78,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       setStatus(`Saved your stats for ${date}!`);
       setMetricValues({});
       setOther("");
+      setDrillsDone({});
       onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -145,6 +163,28 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
             </div>
           );
         })}
+
+        {drills.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <span className="text-xs font-semibold tracking-wide text-accent">Specialized Drills</span>
+            <span className="text-white/30 text-xs">
+              Independent drills from the Drills page — check off any you worked on today.
+            </span>
+            {drills.map((drill) => (
+              <label key={drill.Id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(drillsDone[drill.Id])}
+                  onChange={(e) =>
+                    setDrillsDone((prev) => ({ ...prev, [drill.Id]: e.target.checked }))
+                  }
+                  className="w-4 h-4"
+                />
+                {drill.Name}
+              </label>
+            ))}
+          </div>
+        )}
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs font-semibold tracking-wide text-accent">Other</span>
