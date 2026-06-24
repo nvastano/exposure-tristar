@@ -17,6 +17,7 @@ export const METRIC_CATEGORIES: MetricCategory[] = ["Strength", "Hitting", "Thro
 export const METRIC_DEFS: MetricDef[] = [
   { key: "pushups", label: "Push-ups", type: "number", category: "Strength" },
   { key: "situps", label: "Sit-Ups", type: "number", category: "Strength" },
+  { key: "squats", label: "Squats", type: "number", category: "Strength" },
   { key: "teeWork", label: "Tee Work", type: "boolean", category: "Hitting" },
   { key: "liveBp", label: "Live BP", type: "boolean", category: "Hitting" },
   { key: "frontToss", label: "Front Toss", type: "boolean", category: "Hitting" },
