@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { toEmbedUrl } from "@/lib/drills";
+import { videoEmbed } from "@/lib/drills";
 import type { RawDrillRow } from "@/lib/drills";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 
@@ -134,13 +134,21 @@ function DrillCard({
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3">
       <div className="aspect-video w-full overflow-hidden rounded">
-        <iframe
-          className="w-full h-full"
-          src={toEmbedUrl(drill.VideoUrl)}
-          title={drill.Name}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+        {(() => {
+          const embed = videoEmbed(drill.VideoUrl);
+          if (embed.kind === "video") {
+            return <video className="w-full h-full" src={embed.src} controls />;
+          }
+          return (
+            <iframe
+              className="w-full h-full"
+              src={embed.src}
+              title={drill.Name}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          );
+        })()}
       </div>
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -190,6 +198,39 @@ function DrillForm({
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
+  const [mode, setMode] = useState<"link" | "file">("link");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const res = (await sheetsPost("uploadDrillVideo", {
+        fileName: file.name,
+        mimeType: file.type || "video/mp4",
+        base64,
+      })) as { ok?: boolean; videoUrl?: string; error?: string };
+      if (res.videoUrl) {
+        setVideoUrl(res.videoUrl);
+      } else {
+        setUploadError(res.error || "Upload failed");
+      }
+    } catch (err) {
+      setUploadError((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-accent/40 p-4 flex flex-col gap-3">
@@ -211,19 +252,58 @@ function DrillForm({
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Video link (YouTube)
-        <input
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="https://www.youtube.com/watch?v=..."
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-        />
-      </label>
+
+      <div className="flex gap-4 text-sm text-white/60">
+        <label className="flex items-center gap-1">
+          <input
+            type="radio"
+            checked={mode === "link"}
+            onChange={() => setMode("link")}
+          />
+          Paste a link
+        </label>
+        <label className="flex items-center gap-1">
+          <input
+            type="radio"
+            checked={mode === "file"}
+            onChange={() => setMode("file")}
+          />
+          Upload a file
+        </label>
+      </div>
+
+      {mode === "link" ? (
+        <label className="flex flex-col gap-1 text-sm">
+          Video link (YouTube, Drive, etc.)
+          <input
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+          />
+        </label>
+      ) : (
+        <label className="flex flex-col gap-1 text-sm">
+          Video file
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleFileChange}
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+          />
+          {uploading && <span className="text-white/40 text-xs">Uploading...</span>}
+          {uploadError && <span className="text-accent text-xs">{uploadError}</span>}
+          {videoUrl && !uploading && (
+            <span className="text-white/40 text-xs">Video ready.</span>
+          )}
+        </label>
+      )}
+
       <div className="flex gap-2">
         <button
           onClick={() => name.trim() && videoUrl.trim() && onSave(name.trim(), description.trim(), videoUrl.trim())}
-          className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+          disabled={uploading}
+          className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded disabled:opacity-50"
         >
           Save
         </button>

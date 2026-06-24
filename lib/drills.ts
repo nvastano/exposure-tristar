@@ -21,3 +21,22 @@ export function toEmbedUrl(videoUrl: string): string {
   }
   return trimmed;
 }
+
+// Drill videos can come from a pasted link (YouTube, Google Drive) or from a
+// file uploaded directly through the site, which is stored as a Drive
+// "preview" link. Direct video files (e.g. served from another host) need a
+// <video> tag instead of an <iframe>, so callers need to know which kind a
+// given URL is.
+export function videoEmbed(videoUrl: string): { kind: "iframe" | "video"; src: string } {
+  const trimmed = videoUrl.trim();
+  if (/youtube\.com|youtu\.be/.test(trimmed)) {
+    return { kind: "iframe", src: toEmbedUrl(trimmed) };
+  }
+  if (/drive\.google\.com/.test(trimmed)) {
+    return { kind: "iframe", src: trimmed };
+  }
+  if (/\.(mp4|mov|webm|m4v|ogg)(\?.*)?$/i.test(trimmed)) {
+    return { kind: "video", src: trimmed };
+  }
+  return { kind: "iframe", src: trimmed };
+}
