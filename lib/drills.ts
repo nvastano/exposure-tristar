@@ -1,29 +1,23 @@
-export type Drill = {
-  key: string;
-  name: string;
-  description?: string;
-  youtubeId: string;
+export type RawDrillRow = {
+  Id: string;
+  Name: string;
+  Description?: string;
+  VideoUrl: string;
+  CreatedAt?: string;
 };
 
-// Test placeholders — swap in real drill videos once the coaches send the list.
-// youtubeId is the part after "v=" in a YouTube URL (or the share-link id).
-export const DRILLS: Drill[] = [
-  {
-    key: "tee-work",
-    name: "Tee Work",
-    description: "Placeholder video — swap in the real Tee Work demo.",
-    youtubeId: "dQw4w9WgXcQ",
-  },
-  {
-    key: "long-toss",
-    name: "Long Toss",
-    description: "Placeholder video — swap in the real Long Toss demo.",
-    youtubeId: "dQw4w9WgXcQ",
-  },
-  {
-    key: "fielding-footwork",
-    name: "Fielding Footwork",
-    description: "Placeholder video — swap in the real Fielding Footwork demo.",
-    youtubeId: "dQw4w9WgXcQ",
-  },
-];
+// Accepts any of the common YouTube link shapes a coach might paste in
+// (watch?v=, youtu.be/, embed/, shorts/) and returns an embeddable URL.
+// Falls back to the raw URL as-is if it's not a recognizable YouTube link
+// (e.g. a direct video file or another host), so embedding still works.
+export function toEmbedUrl(videoUrl: string): string {
+  const trimmed = videoUrl.trim();
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/,
+  ];
+  for (const re of patterns) {
+    const match = trimmed.match(re);
+    if (match) return `https://www.youtube.com/embed/${match[1]}`;
+  }
+  return trimmed;
+}

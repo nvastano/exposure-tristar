@@ -8,6 +8,7 @@
 var PLAYERS_SHEET = "Players";
 var ENTRIES_SHEET = "Entries";
 var METRICS_SHEET = "Metrics";
+var DRILLS_SHEET = "Drills";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -128,6 +129,12 @@ function metricsSheet_() {
   return sheet;
 }
 
+function drillsSheet_() {
+  var sheet = getSheet_(DRILLS_SHEET, ["Id", "Name", "Description", "VideoUrl", "CreatedAt"]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
 function newId_() {
   return Utilities.getUuid();
 }
@@ -193,6 +200,8 @@ function doGet(e) {
       });
     }
     result = allMetrics;
+  } else if (action === "drills") {
+    result = rowsToObjects_(drillsSheet_().getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -326,6 +335,37 @@ function doPost(e) {
       result = { error: "metric not found" };
     } else {
       mSheet2.deleteRow(mRow2);
+      result = { ok: true };
+    }
+  } else if (body.action === "addDrill") {
+    appendRowByHeaders_(drillsSheet_(), {
+      Id: newId_(),
+      Name: body.name,
+      Description: body.description || "",
+      VideoUrl: body.videoUrl,
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "updateDrill") {
+    var dSheet = drillsSheet_();
+    var dRow = findRowById_(dSheet, body.id);
+    if (dRow === -1) {
+      result = { error: "drill not found" };
+    } else {
+      var dUpdates = {};
+      if (body.name !== undefined) dUpdates.Name = body.name;
+      if (body.description !== undefined) dUpdates.Description = body.description;
+      if (body.videoUrl !== undefined) dUpdates.VideoUrl = body.videoUrl;
+      setRowByHeaders_(dSheet, dRow, dUpdates);
+      result = { ok: true };
+    }
+  } else if (body.action === "deleteDrill") {
+    var dSheet2 = drillsSheet_();
+    var dRow2 = findRowById_(dSheet2, body.id);
+    if (dRow2 === -1) {
+      result = { error: "drill not found" };
+    } else {
+      dSheet2.deleteRow(dRow2);
       result = { ok: true };
     }
   } else {
