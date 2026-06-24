@@ -45,6 +45,9 @@ export default function RootLayout({
             <Link href="/practice" className="hover:text-accent transition-colors">
               PRACTICE STATS
             </Link>
+            <Link href="/drills" className="hover:text-accent transition-colors">
+              DRILLS
+            </Link>
           </nav>
         </header>
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto">{children}</main>
