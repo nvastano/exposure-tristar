@@ -135,23 +135,6 @@ function drillsSheet_() {
   return sheet;
 }
 
-// Folder where uploaded drill video files are stored (created once, reused after).
-function drillVideosFolder_() {
-  var name = "TriStar Drill Videos";
-  var folders = DriveApp.getFoldersByName(name);
-  if (folders.hasNext()) return folders.next();
-  return DriveApp.createFolder(name);
-}
-
-// Saves an uploaded video file to Drive and returns an embeddable URL.
-function uploadDrillVideo_(fileName, mimeType, base64Data) {
-  var bytes = Utilities.base64Decode(base64Data);
-  var blob = Utilities.newBlob(bytes, mimeType, fileName);
-  var file = drillVideosFolder_().createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return "https://drive.google.com/file/d/" + file.getId() + "/preview";
-}
-
 function newId_() {
   return Utilities.getUuid();
 }
@@ -353,13 +336,6 @@ function doPost(e) {
     } else {
       mSheet2.deleteRow(mRow2);
       result = { ok: true };
-    }
-  } else if (body.action === "uploadDrillVideo") {
-    try {
-      var videoUrl = uploadDrillVideo_(body.fileName, body.mimeType, body.base64);
-      result = { ok: true, videoUrl: videoUrl };
-    } catch (err) {
-      result = { error: String(err) };
     }
   } else if (body.action === "addDrill") {
     appendRowByHeaders_(drillsSheet_(), {
