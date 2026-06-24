@@ -8,6 +8,7 @@ import type { RawEntryRow, Session } from "@/lib/stats";
 import type { RawMetricRow } from "@/lib/metrics";
 import { metricDef } from "@/lib/metrics";
 import PlayerCharts from "./PlayerCharts";
+import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 
@@ -23,6 +24,7 @@ function PlayerContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(playerName));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { unlocked, setUnlocked } = useCoachUnlocked();
 
   async function load() {
     if (!playerName) return;
@@ -107,7 +109,10 @@ function PlayerContent() {
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-wide">{playerName}</h1>
-          {editingNumber ? (
+          {player?.Number && !editingNumber && (
+            <span className="text-white/40 text-lg font-mono">#{player.Number}</span>
+          )}
+          {unlocked && editingNumber && (
             <>
               <input
                 autoFocus
@@ -130,7 +135,8 @@ function PlayerContent() {
                 Cancel
               </button>
             </>
-          ) : (
+          )}
+          {unlocked && !editingNumber && (
             <button
               onClick={() => {
                 setNumberInput(player?.Number || "");
@@ -139,11 +145,14 @@ function PlayerContent() {
               className="text-white/40 hover:text-accent text-lg font-mono"
               title="Edit jersey number"
             >
-              {player?.Number ? `#${player.Number}` : "+ #"}
+              {player?.Number ? "✎" : "+ #"}
             </button>
           )}
         </div>
         <p className="text-white/50 text-sm mt-1">Week-over-week progress</p>
+        <div className="mt-2">
+          <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
+        </div>
       </div>
 
       {sessions.length === 0 ? (
@@ -174,6 +183,7 @@ function PlayerContent() {
                       key={s.id || s.date}
                       session={s}
                       editing={editingId === s.id}
+                      canEdit={unlocked}
                       onEdit={() => setEditingId(s.id)}
                       onCancel={() => setEditingId(null)}
                       onSave={handleSaveSession}
@@ -207,13 +217,15 @@ function PlayerContent() {
                     <td className="px-4 py-2">{metricDef(m.Metric)?.label || m.Metric}</td>
                     <td className="px-4 py-2 font-mono">{m.Value}</td>
                     <td className="px-4 py-2">
-                      <button
-                        onClick={() => handleDeleteMetric(m.Id)}
-                        className="text-white/40 hover:text-accent"
-                        aria-label="Delete"
-                      >
-                        ✕
-                      </button>
+                      {unlocked && (
+                        <button
+                          onClick={() => handleDeleteMetric(m.Id)}
+                          className="text-white/40 hover:text-accent"
+                          aria-label="Delete"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -228,6 +240,7 @@ function PlayerContent() {
 function SessionRow({
   session,
   editing,
+  canEdit,
   onEdit,
   onCancel,
   onSave,
@@ -235,6 +248,7 @@ function SessionRow({
 }: {
   session: Session;
   editing: boolean;
+  canEdit: boolean;
   onEdit: () => void;
   onCancel: () => void;
   onSave: (session: Session, sprintStr: string, throwStr: string, notes: string) => void;
@@ -244,7 +258,7 @@ function SessionRow({
   const [throwStr, setThrowStr] = useState(session.throwVelos.join(", "));
   const [notes, setNotes] = useState(session.notes);
 
-  if (editing) {
+  if (editing && canEdit) {
     return (
       <tr className="border-t border-white/10 bg-white/5">
         <td className="px-4 py-2 whitespace-nowrap">{session.date}</td>
@@ -299,12 +313,16 @@ function SessionRow({
       </td>
       <td className="px-4 py-2 text-white/50">{session.notes || "—"}</td>
       <td className="px-4 py-2 whitespace-nowrap">
-        <button onClick={onEdit} className="text-white/40 hover:text-accent mr-2" aria-label="Edit">
-          ✎
-        </button>
-        <button onClick={onDelete} className="text-white/40 hover:text-accent" aria-label="Delete">
-          ✕
-        </button>
+        {canEdit && (
+          <>
+            <button onClick={onEdit} className="text-white/40 hover:text-accent mr-2" aria-label="Edit">
+              ✎
+            </button>
+            <button onClick={onDelete} className="text-white/40 hover:text-accent" aria-label="Delete">
+              ✕
+            </button>
+          </>
+        )}
       </td>
     </tr>
   );

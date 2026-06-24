@@ -17,6 +17,7 @@ import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
 import CoachEntryForm from "@/components/CoachEntryForm";
 import Modal from "@/components/Modal";
+import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Position?: string };
 
@@ -42,6 +43,7 @@ export default function Home() {
   const [newNumber, setNewNumber] = useState("");
   const [showCoachEntry, setShowCoachEntry] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const { unlocked, setUnlocked } = useCoachUnlocked();
 
   async function refresh() {
     setLoading(true);
@@ -144,13 +146,16 @@ export default function Home() {
               </select>
             </label>
           )}
-          <button
-            onClick={() => setShowCoachEntry(true)}
-            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
-          >
-            + Coach Entry
-          </button>
-          {!addingPlayer && (
+          <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
+          {unlocked && (
+            <button
+              onClick={() => setShowCoachEntry(true)}
+              className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+            >
+              + Coach Entry
+            </button>
+          )}
+          {unlocked && !addingPlayer && (
             <button
               onClick={() => setAddingPlayer(true)}
               className="bg-white/10 hover:bg-white/20 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
@@ -161,7 +166,7 @@ export default function Home() {
         </div>
       </div>
 
-      {addingPlayer && (
+      {unlocked && addingPlayer && (
         <div className="rounded-lg border border-white/10 p-4 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Name
@@ -253,28 +258,32 @@ export default function Home() {
                     </Link>
                   )}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setEditing(player.Id);
-                  }}
-                  className="text-white/30 hover:text-accent text-xs px-1"
-                  aria-label="Edit name"
-                  title="Rename"
-                >
-                  ✎
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDelete(player);
-                  }}
-                  className="text-white/30 hover:text-accent text-xs px-1"
-                  aria-label="Delete player"
-                  title="Delete"
-                >
-                  ✕
-                </button>
+                {unlocked && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setEditing(player.Id);
+                      }}
+                      className="text-white/30 hover:text-accent text-xs px-1"
+                      aria-label="Edit name"
+                      title="Rename"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDelete(player);
+                      }}
+                      className="text-white/30 hover:text-accent text-xs px-1"
+                      aria-label="Delete player"
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
               </div>
 
               <Link href={`/players?name=${encodeURIComponent(player.Name)}`} className="flex flex-col gap-3">
