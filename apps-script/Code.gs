@@ -9,6 +9,7 @@ var PLAYERS_SHEET = "Players";
 var ENTRIES_SHEET = "Entries";
 var METRICS_SHEET = "Metrics";
 var DRILLS_SHEET = "Drills";
+var DRILL_CATEGORIES_SHEET = "DrillCategories";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -130,9 +131,36 @@ function metricsSheet_() {
 }
 
 function drillsSheet_() {
-  var sheet = getSheet_(DRILLS_SHEET, ["Id", "Name", "Description", "VideoUrl", "CreatedAt"]);
+  var sheet = getSheet_(DRILLS_SHEET, [
+    "Id",
+    "Name",
+    "Description",
+    "VideoUrl",
+    "Category",
+    "Order",
+    "CreatedAt",
+  ]);
+  ensureColumn_(sheet, "Category");
+  ensureColumn_(sheet, "Order");
   backfillIds_(sheet);
   return sheet;
+}
+
+function drillCategoriesSheet_() {
+  var sheet = getSheet_(DRILL_CATEGORIES_SHEET, ["Id", "Name", "Order", "CreatedAt"]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
+// Returns the next Order value to append an item at the end of a list,
+// where existingOrders is the set of Order values already in use.
+function nextOrder_(existingOrders) {
+  var max = -1;
+  existingOrders.forEach(function (o) {
+    var n = Number(o);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return max + 1;
 }
 
 function newId_() {
@@ -202,6 +230,8 @@ function doGet(e) {
     result = allMetrics;
   } else if (action === "drills") {
     result = rowsToObjects_(drillsSheet_().getDataRange().getValues());
+  } else if (action === "drillCategories") {
+    result = rowsToObjects_(drillCategoriesSheet_().getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -341,11 +371,23 @@ function doPost(e) {
       result = { ok: true };
     }
   } else if (body.action === "addDrill") {
+    var newDrillCategory = body.category || "";
+    var dCol = ensureColumn_(drillsSheet_(), "Category");
+    var oCol = ensureColumn_(drillsSheet_(), "Order");
+    var existingDrillData = drillsSheet_().getDataRange().getValues();
+    var sameCategoryOrders = [];
+    for (var di = 1; di < existingDrillData.length; di++) {
+      if (String(existingDrillData[di][dCol - 1]) === String(newDrillCategory)) {
+        sameCategoryOrders.push(existingDrillData[di][oCol - 1]);
+      }
+    }
     appendRowByHeaders_(drillsSheet_(), {
       Id: newId_(),
       Name: body.name,
       Description: body.description || "",
       VideoUrl: body.videoUrl,
+      Category: newDrillCategory,
+      Order: nextOrder_(sameCategoryOrders),
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
@@ -359,6 +401,8 @@ function doPost(e) {
       if (body.name !== undefined) dUpdates.Name = body.name;
       if (body.description !== undefined) dUpdates.Description = body.description;
       if (body.videoUrl !== undefined) dUpdates.VideoUrl = body.videoUrl;
+      if (body.category !== undefined) dUpdates.Category = body.category;
+      if (body.order !== undefined) dUpdates.Order = body.order;
       setRowByHeaders_(dSheet, dRow, dUpdates);
       result = { ok: true };
     }
@@ -371,6 +415,65 @@ function doPost(e) {
       dSheet2.deleteRow(dRow2);
       result = { ok: true };
     }
+  } else if (body.action === "reorderDrills") {
+    var rSheet = drillsSheet_();
+    (body.order || []).forEach(function (item) {
+      var rRow = findRowById_(rSheet, item.id);
+      if (rRow !== -1) {
+        setRowByHeaders_(rSheet, rRow, { Category: item.category || "", Order: item.order });
+      }
+    });
+    result = { ok: true };
+  } else if (body.action === "addCategory") {
+    var cSheet = drillCategoriesSheet_();
+    var cData = cSheet.getDataRange().getValues();
+    var cOrderCol = ensureColumn_(cSheet, "Order");
+    var cOrders = [];
+    for (var ci = 1; ci < cData.length; ci++) cOrders.push(cData[ci][cOrderCol - 1]);
+    appendRowByHeaders_(cSheet, {
+      Id: newId_(),
+      Name: body.name,
+      Order: nextOrder_(cOrders),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "updateCategory") {
+    var ucSheet = drillCategoriesSheet_();
+    var ucRow = findRowById_(ucSheet, body.id);
+    if (ucRow === -1) {
+      result = { error: "category not found" };
+    } else {
+      var ucUpdates = {};
+      if (body.name !== undefined) ucUpdates.Name = body.name;
+      setRowByHeaders_(ucSheet, ucRow, ucUpdates);
+      result = { ok: true };
+    }
+  } else if (body.action === "deleteCategory") {
+    var dcSheet = drillCategoriesSheet_();
+    var dcRow = findRowById_(dcSheet, body.id);
+    if (dcRow === -1) {
+      result = { error: "category not found" };
+    } else {
+      dcSheet.deleteRow(dcRow);
+      var ddSheet = drillsSheet_();
+      var ddData = ddSheet.getDataRange().getValues();
+      var ddCatCol = ensureColumn_(ddSheet, "Category");
+      for (var ddi = 1; ddi < ddData.length; ddi++) {
+        if (String(ddData[ddi][ddCatCol - 1]) === String(body.id)) {
+          setCell_(ddSheet, ddi + 1, ddCatCol, "Category", "");
+        }
+      }
+      result = { ok: true };
+    }
+  } else if (body.action === "reorderCategories") {
+    var rcSheet = drillCategoriesSheet_();
+    (body.order || []).forEach(function (catId, idx) {
+      var rcRow = findRowById_(rcSheet, catId);
+      if (rcRow !== -1) {
+        setRowByHeaders_(rcSheet, rcRow, { Order: idx });
+      }
+    });
+    result = { ok: true };
   } else {
     result = { error: "unknown action" };
   }

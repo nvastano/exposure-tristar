@@ -3,8 +3,19 @@ export type RawDrillRow = {
   Name: string;
   Description?: string;
   VideoUrl: string;
+  Category?: string;
+  Order?: string | number;
   CreatedAt?: string;
 };
+
+export type RawDrillCategoryRow = {
+  Id: string;
+  Name: string;
+  Order?: string | number;
+  CreatedAt?: string;
+};
+
+export const UNCATEGORIZED = "__uncategorized__";
 
 // Accepts any of the common YouTube link shapes a coach might paste in
 // (watch?v=, youtu.be/, embed/, shorts/) and returns an embeddable URL.
