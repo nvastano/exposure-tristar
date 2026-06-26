@@ -268,10 +268,17 @@ export default function DrillsPage() {
                 refresh();
               }}
               onDeleteDrill={handleDeleteDrill}
-              onSaveDrill={async (drill, name, description, videoUrl) => {
-                await sheetsPost("updateDrill", { id: drill.Id, name, description, videoUrl });
+              onSaveDrill={async (drill, name, description, videoUrl, category) => {
+                await sheetsPost("updateDrill", {
+                  id: drill.Id,
+                  name,
+                  description,
+                  videoUrl,
+                  category: category === UNCATEGORIZED ? "" : category,
+                });
                 refresh();
               }}
+              categories={categories}
             />
           );
         })}
@@ -296,6 +303,7 @@ function CategorySection({
   onSaveAdd,
   onDeleteDrill,
   onSaveDrill,
+  categories,
 }: {
   section: { id: string; name: string; category?: RawDrillCategoryRow };
   drills: RawDrillRow[];
@@ -311,7 +319,14 @@ function CategorySection({
   onCancelAdd: () => void;
   onSaveAdd: (name: string, description: string, videoUrl: string) => void;
   onDeleteDrill: (drill: RawDrillRow) => void;
-  onSaveDrill: (drill: RawDrillRow, name: string, description: string, videoUrl: string) => void;
+  onSaveDrill: (
+    drill: RawDrillRow,
+    name: string,
+    description: string,
+    videoUrl: string,
+    category: string
+  ) => void;
+  categories: RawDrillCategoryRow[];
 }) {
   const { setNodeRef } = useDroppable({ id: `col:${section.id}` });
   const [renaming, setRenaming] = useState(false);
@@ -411,7 +426,10 @@ function CategorySection({
                 drill={drill}
                 canEdit={canEdit}
                 onDelete={() => onDeleteDrill(drill)}
-                onSave={(name, description, videoUrl) => onSaveDrill(drill, name, description, videoUrl)}
+                onSave={(name, description, videoUrl, category) =>
+                  onSaveDrill(drill, name, description, videoUrl, category)
+                }
+                categories={categories}
               />
             ))}
           </div>
@@ -426,11 +444,13 @@ function DraggableDrillCard({
   canEdit,
   onSave,
   onDelete,
+  categories,
 }: {
   drill: RawDrillRow;
   canEdit: boolean;
-  onSave: (name: string, description: string, videoUrl: string) => void;
+  onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onDelete: () => void;
+  categories: RawDrillCategoryRow[];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: drill.Id,
@@ -449,6 +469,7 @@ function DraggableDrillCard({
         onSave={onSave}
         onDelete={onDelete}
         dragHandleProps={canEdit ? { ...attributes, ...listeners } : undefined}
+        categories={categories}
       />
     </div>
   );
@@ -460,12 +481,14 @@ function DrillCard({
   onSave,
   onDelete,
   dragHandleProps,
+  categories,
 }: {
   drill: RawDrillRow;
   canEdit: boolean;
-  onSave: (name: string, description: string, videoUrl: string) => void;
+  onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onDelete: () => void;
   dragHandleProps?: Record<string, unknown>;
+  categories: RawDrillCategoryRow[];
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -475,9 +498,11 @@ function DrillCard({
         initialName={drill.Name}
         initialDescription={drill.Description}
         initialVideoUrl={drill.VideoUrl}
+        initialCategory={drill.Category || UNCATEGORIZED}
+        categories={categories}
         onCancel={() => setEditing(false)}
-        onSave={(name, description, videoUrl) => {
-          onSave(name, description, videoUrl);
+        onSave={(name, description, videoUrl, category) => {
+          onSave(name, description, videoUrl, category);
           setEditing(false);
         }}
       />
@@ -541,18 +566,23 @@ function DrillForm({
   initialName = "",
   initialDescription = "",
   initialVideoUrl = "",
+  initialCategory,
+  categories,
   onSave,
   onCancel,
 }: {
   initialName?: string;
   initialDescription?: string;
   initialVideoUrl?: string;
-  onSave: (name: string, description: string, videoUrl: string) => void;
+  initialCategory?: string;
+  categories?: RawDrillCategoryRow[];
+  onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
+  const [category, setCategory] = useState(initialCategory ?? UNCATEGORIZED);
 
   return (
     <div className="rounded-lg border border-accent/40 p-4 flex flex-col gap-3">
@@ -583,9 +613,30 @@ function DrillForm({
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
+      {categories && (
+        <label className="flex flex-col gap-1 text-sm">
+          Category
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+          >
+            <option value={UNCATEGORIZED}>Uncategorized</option>
+            {categories.map((c) => (
+              <option key={c.Id} value={c.Id}>
+                {c.Name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="flex gap-2">
         <button
-          onClick={() => name.trim() && videoUrl.trim() && onSave(name.trim(), description.trim(), videoUrl.trim())}
+          onClick={() =>
+            name.trim() &&
+            videoUrl.trim() &&
+            onSave(name.trim(), description.trim(), videoUrl.trim(), category)
+          }
           className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
         >
           Save
