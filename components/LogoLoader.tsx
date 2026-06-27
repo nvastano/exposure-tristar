@@ -1,4 +1,4 @@
-export default function LogoLoader({ size = 64, label = "Loading..." }: { size?: number; label?: string }) {
+export default function LogoLoader({ size = 128, label = "Loading..." }: { size?: number; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 py-10">
       <svg
