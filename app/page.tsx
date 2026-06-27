@@ -15,6 +15,7 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { toEmbedUrl, UNCATEGORIZED } from "@/lib/drills";
 import type { RawDrillRow, RawDrillCategoryRow } from "@/lib/drills";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
+import LogoLoader from "@/components/LogoLoader";
 
 type Columns = Record<string, RawDrillRow[]>;
 
@@ -167,7 +168,7 @@ export default function DrillsPage() {
   }
 
   if (loading) {
-    return <p className="text-white/50 text-sm">Loading...</p>;
+    return <LogoLoader />;
   }
 
   if (error) {

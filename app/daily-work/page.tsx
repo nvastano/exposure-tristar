@@ -6,6 +6,7 @@ import type { RawMetricRow } from "@/lib/metrics";
 import DailyDigest from "@/components/DailyDigest";
 import PlayerEntryForm from "@/components/PlayerEntryForm";
 import Modal from "@/components/Modal";
+import LogoLoader from "@/components/LogoLoader";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 
@@ -36,7 +37,7 @@ export default function DailyPage() {
   }, []);
 
   if (loading) {
-    return <p className="text-white/50 text-sm">Loading...</p>;
+    return <LogoLoader />;
   }
 
   if (error) {

@@ -13,6 +13,7 @@ import {
   formatDate,
 } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
+import LogoLoader from "@/components/LogoLoader";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
 import CoachEntryForm from "@/components/CoachEntryForm";
@@ -104,7 +105,7 @@ export default function Home() {
   }
 
   if (loading) {
-    return <p className="text-white/50 text-sm">Loading...</p>;
+    return <LogoLoader />;
   }
 
   if (error) {

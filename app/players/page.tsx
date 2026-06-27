@@ -9,6 +9,7 @@ import type { RawMetricRow } from "@/lib/metrics";
 import { metricDef } from "@/lib/metrics";
 import PlayerCharts from "./PlayerCharts";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
+import LogoLoader from "@/components/LogoLoader";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 
@@ -92,7 +93,7 @@ function PlayerContent() {
   }
 
   if (loading) {
-    return <p className="text-white/50 text-sm">Loading...</p>;
+    return <LogoLoader />;
   }
 
   if (error) {
@@ -330,7 +331,7 @@ function SessionRow({
 
 export default function PlayerPage() {
   return (
-    <Suspense fallback={<p className="text-white/50 text-sm">Loading...</p>}>
+    <Suspense fallback={<LogoLoader />}>
       <PlayerContent />
     </Suspense>
   );
