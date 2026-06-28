@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { RawMetricRow } from "@/lib/metrics";
 import { metricDef } from "@/lib/metrics";
 import { formatDate, localDateStr } from "@/lib/stats";
@@ -70,7 +71,10 @@ export default function DailyDigest({
             const entries = byPlayer.get(player.Name) || [];
             return (
               <div key={player.Id} className="rounded-lg border border-white/10 p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
+                <Link
+                  href={`/players?name=${encodeURIComponent(player.Name)}`}
+                  className="flex items-center gap-2 hover:text-accent transition-colors"
+                >
                   <PlayerPhoto name={player.Name} size={32} />
                   <span className="font-semibold text-sm">
                     {player.Number && (
@@ -78,7 +82,7 @@ export default function DailyDigest({
                     )}
                     {player.Name}
                   </span>
-                </div>
+                </Link>
                 <ul className="flex flex-col gap-1 text-sm text-white/70">
                   {entries.map((m) => {
                     const def = metricDef(m.Metric);

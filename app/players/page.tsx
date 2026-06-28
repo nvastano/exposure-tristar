@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import { normalizeSessions, formatDate } from "@/lib/stats";
+import { normalizeSessions } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import type { RawMetricRow } from "@/lib/metrics";
-import { metricDef } from "@/lib/metrics";
 import PlayerCharts from "./PlayerCharts";
+import PlayerDailyWork from "@/components/PlayerDailyWork";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 
@@ -156,84 +156,54 @@ function PlayerContent() {
         </div>
       </div>
 
-      {sessions.length === 0 ? (
-        <p className="text-white/50 text-sm">No sessions logged yet for this player.</p>
-      ) : (
-        <>
-          <PlayerCharts sessions={sessions} />
+      <div className="flex flex-col gap-4">
+        <h2 className="text-lg font-bold tracking-wide">Practice Stats</h2>
+        {sessions.length === 0 ? (
+          <p className="text-white/50 text-sm">No sessions logged yet for this player.</p>
+        ) : (
+          <>
+            <PlayerCharts sessions={sessions} />
 
-          <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full text-sm">
-              <thead className="bg-white/5 text-white/60">
-                <tr>
-                  <th className="text-left px-4 py-2">Date</th>
-                  <th className="text-left px-4 py-2">Sprint times (s)</th>
-                  <th className="text-left px-4 py-2">Best sprint</th>
-                  <th className="text-left px-4 py-2">Throw velos (mph)</th>
-                  <th className="text-left px-4 py-2">Best throw</th>
-                  <th className="text-left px-4 py-2">Notes</th>
-                  <th className="text-left px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions
-                  .slice()
-                  .reverse()
-                  .map((s) => (
-                    <SessionRow
-                      key={s.id || s.date}
-                      session={s}
-                      editing={editingId === s.id}
-                      canEdit={unlocked}
-                      onEdit={() => setEditingId(s.id)}
-                      onCancel={() => setEditingId(null)}
-                      onSave={handleSaveSession}
-                      onDelete={() => handleDeleteSession(s)}
-                    />
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {metrics.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-white/10">
-          <table className="w-full text-sm">
-            <thead className="bg-white/5 text-white/60">
-              <tr>
-                <th className="text-left px-4 py-2">Date</th>
-                <th className="text-left px-4 py-2">Stat</th>
-                <th className="text-left px-4 py-2">Value</th>
-                <th className="text-left px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {metrics
-                .slice()
-                .reverse()
-                .map((m) => (
-                  <tr key={m.Id} className="border-t border-white/10">
-                    <td className="px-4 py-2 whitespace-nowrap">{formatDate(m.Date)}</td>
-                    <td className="px-4 py-2">{metricDef(m.Metric)?.label || m.Metric}</td>
-                    <td className="px-4 py-2 font-mono">{m.Value}</td>
-                    <td className="px-4 py-2">
-                      {unlocked && (
-                        <button
-                          onClick={() => handleDeleteMetric(m.Id)}
-                          className="text-white/40 hover:text-accent"
-                          aria-label="Delete"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </td>
+            <div className="overflow-x-auto rounded-lg border border-white/10">
+              <table className="w-full text-sm">
+                <thead className="bg-white/5 text-white/60">
+                  <tr>
+                    <th className="text-left px-4 py-2">Date</th>
+                    <th className="text-left px-4 py-2">Sprint times (s)</th>
+                    <th className="text-left px-4 py-2">Best sprint</th>
+                    <th className="text-left px-4 py-2">Throw velos (mph)</th>
+                    <th className="text-left px-4 py-2">Best throw</th>
+                    <th className="text-left px-4 py-2">Notes</th>
+                    <th className="text-left px-4 py-2"></th>
                   </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {sessions
+                    .slice()
+                    .reverse()
+                    .map((s) => (
+                      <SessionRow
+                        key={s.id || s.date}
+                        session={s}
+                        editing={editingId === s.id}
+                        canEdit={unlocked}
+                        onEdit={() => setEditingId(s.id)}
+                        onCancel={() => setEditingId(null)}
+                        onSave={handleSaveSession}
+                        onDelete={() => handleDeleteSession(s)}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h2 className="text-lg font-bold tracking-wide">Daily Work</h2>
+        <PlayerDailyWork metrics={metrics} canEdit={unlocked} onDelete={handleDeleteMetric} />
+      </div>
     </div>
   );
 }
