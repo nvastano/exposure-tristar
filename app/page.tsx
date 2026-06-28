@@ -13,6 +13,7 @@ import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sort
 import { CSS } from "@dnd-kit/utilities";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { toEmbedUrl, UNCATEGORIZED } from "@/lib/drills";
+import { formatDate } from "@/lib/stats";
 import type { RawDrillRow, RawDrillCategoryRow } from "@/lib/drills";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
@@ -526,6 +527,9 @@ function DrillCard({
           <span className="font-semibold text-sm">{drill.Name}</span>
           {drill.Description && (
             <p className="text-white/50 text-xs mt-1">{drill.Description}</p>
+          )}
+          {drill.CreatedAt && (
+            <p className="text-white/30 text-xs mt-1">Added {formatDate(drill.CreatedAt)}</p>
           )}
         </div>
         {canEdit && (
