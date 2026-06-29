@@ -104,7 +104,7 @@ export default function FootagePage() {
       {footage.length === 0 ? (
         <p className="text-white/30 text-sm">No clips uploaded yet.</p>
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {footage.map((item) => (
             <FootageCard
               key={item.Id}
