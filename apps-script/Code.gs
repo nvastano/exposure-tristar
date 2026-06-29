@@ -683,6 +683,11 @@ function doPost(e) {
       diSheet.deleteRow(diRow);
       result = { ok: true };
     }
+  } else if (body.action === "seedPracticePlanDrills") {
+    (body.names || []).forEach(function (n) {
+      ensurePlanDrill_(n);
+    });
+    result = { ok: true, count: (body.names || []).length };
   } else {
     result = { error: "unknown action" };
   }
