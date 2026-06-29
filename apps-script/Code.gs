@@ -166,8 +166,10 @@ function footageNotesSheet_() {
     "FootageId",
     "Player",
     "Note",
+    "GroupId",
     "CreatedAt",
   ]);
+  ensureColumn_(sheet, "GroupId");
   backfillIds_(sheet);
   return sheet;
 }
@@ -532,17 +534,25 @@ function doPost(e) {
       result = { ok: true };
     }
   } else if (body.action === "addFootageNote") {
-    ensurePlayer_(body.player);
-    appendRowByHeaders_(footageNotesSheet_(), {
-      Id: newId_(),
-      FootageId: body.footageId,
-      Player: body.player,
-      Note: body.note,
-      CreatedAt: new Date().toISOString(),
+    var notePlayers = body.players || (body.player ? [body.player] : []);
+    var noteSheet = footageNotesSheet_();
+    var noteGroupId = newId_();
+    notePlayers.forEach(function (p) {
+      ensurePlayer_(p);
+      appendRowByHeaders_(noteSheet, {
+        Id: newId_(),
+        FootageId: body.footageId,
+        Player: p,
+        Note: body.note,
+        GroupId: noteGroupId,
+        CreatedAt: new Date().toISOString(),
+      });
     });
-    notifyGroupMe_(
-      body.player + " got called out on a practice clip 🎥\n" + body.note
-    );
+    if (notePlayers.length) {
+      notifyGroupMe_(
+        notePlayers.join(", ") + " got called out on a practice clip 🎥\n" + body.note
+      );
+    }
     result = { ok: true };
   } else if (body.action === "deleteFootageNote") {
     var fnSheet2 = footageNotesSheet_();
@@ -550,7 +560,14 @@ function doPost(e) {
     if (fnRow2 === -1) {
       result = { error: "footage note not found" };
     } else {
-      fnSheet2.deleteRow(fnRow2);
+      var fnGroupCol = ensureColumn_(fnSheet2, "GroupId");
+      var fnGroupId = fnSheet2.getRange(fnRow2, fnGroupCol).getValue();
+      var fnData2 = fnSheet2.getDataRange().getValues();
+      for (var fni2 = fnData2.length - 1; fni2 >= 1; fni2--) {
+        if (fnGroupId && String(fnData2[fni2][fnGroupCol - 1]) === String(fnGroupId)) {
+          fnSheet2.deleteRow(fni2 + 1);
+        }
+      }
       result = { ok: true };
     }
   } else {

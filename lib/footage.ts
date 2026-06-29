@@ -11,5 +11,6 @@ export type RawFootageNoteRow = {
   FootageId: string;
   Player: string;
   Note: string;
+  GroupId?: string;
   CreatedAt?: string;
 };

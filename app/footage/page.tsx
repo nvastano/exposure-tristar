@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { toEmbedUrl } from "@/lib/drills";
 import { formatDate } from "@/lib/stats";
@@ -114,8 +114,8 @@ export default function FootagePage() {
               canEdit={unlocked}
               onDelete={() => handleDeleteFootage(item)}
               onDeleteNote={handleDeleteNote}
-              onAddNote={async (player, note) => {
-                await sheetsPost("addFootageNote", { footageId: item.Id, player, note });
+              onAddNote={async (selectedPlayers, note) => {
+                await sheetsPost("addFootageNote", { footageId: item.Id, players: selectedPlayers, note });
                 refresh();
               }}
             />
@@ -141,9 +141,19 @@ function FootageCard({
   canEdit: boolean;
   onDelete: () => void;
   onDeleteNote: (id: string) => void;
-  onAddNote: (player: string, note: string) => void;
+  onAddNote: (players: string[], note: string) => void;
 }) {
   const [addingNote, setAddingNote] = useState(false);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, RawFootageNoteRow[]>();
+    for (const n of notes) {
+      const key = n.GroupId || n.Id;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(n);
+    }
+    return Array.from(map.values());
+  }, [notes]);
 
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3">
@@ -174,13 +184,15 @@ function FootageCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        {notes.map((n) => (
-          <div key={n.Id} className="flex items-center gap-2 text-sm text-white/80">
-            <span className="font-semibold text-accent">{n.Player}:</span>
-            <span>{n.Note}</span>
+        {groups.map((group) => (
+          <div key={group[0].Id} className="flex items-center gap-2 text-sm text-white/80">
+            <span className="font-semibold text-accent">
+              {group.map((n) => n.Player).join(", ")}:
+            </span>
+            <span>{group[0].Note}</span>
             {canEdit && (
               <button
-                onClick={() => onDeleteNote(n.Id)}
+                onClick={() => onDeleteNote(group[0].Id)}
                 className="text-white/30 hover:text-accent"
                 aria-label="Delete callout"
                 title="Delete"
@@ -204,8 +216,8 @@ function FootageCard({
           <NoteForm
             players={players}
             onCancel={() => setAddingNote(false)}
-            onSave={(player, note) => {
-              onAddNote(player, note);
+            onSave={(selectedPlayers, note) => {
+              onAddNote(selectedPlayers, note);
               setAddingNote(false);
             }}
           />
@@ -222,27 +234,34 @@ function NoteForm({
 }: {
   players: PlayerRow[];
   onCancel: () => void;
-  onSave: (player: string, note: string) => void;
+  onSave: (players: string[], note: string) => void;
 }) {
-  const [player, setPlayer] = useState(players[0]?.Name || "");
+  const [selected, setSelected] = useState<string[]>(players[0] ? [players[0].Name] : []);
   const [note, setNote] = useState("");
+
+  function toggle(name: string) {
+    setSelected((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 rounded border border-accent/40 p-3">
-      <label className="flex flex-col gap-1 text-sm">
-        Player
-        <select
-          value={player}
-          onChange={(e) => setPlayer(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-        >
+      <div className="flex flex-col gap-1 text-sm">
+        Players
+        <div className="flex flex-wrap gap-3 bg-white/5 border border-white/10 rounded px-3 py-2 max-h-32 overflow-y-auto">
           {players.map((p) => (
-            <option key={p.Id} value={p.Name}>
+            <label key={p.Id} className="flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={selected.includes(p.Name)}
+                onChange={() => toggle(p.Name)}
+              />
               {p.Name}
-            </option>
+            </label>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
       <label className="flex flex-col gap-1 text-sm">
         Callout
         <input
@@ -255,7 +274,7 @@ function NoteForm({
       </label>
       <div className="flex gap-2">
         <button
-          onClick={() => player && note.trim() && onSave(player, note.trim())}
+          onClick={() => selected.length > 0 && note.trim() && onSave(selected, note.trim())}
           className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
         >
           Save
