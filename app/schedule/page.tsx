@@ -2,7 +2,7 @@ const CALENDAR_ID = "2808a6446a55f37a122d29fc0ec8318a90c423e10306263af5c59f8be4c
 
 const EMBED_URL = `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(
   CALENDAR_ID
-)}&ctz=America%2FChicago&mode=MONTH&showTitle=0&showPrint=0&showCalendars=0&showTz=0`;
+)}&ctz=America%2FChicago&mode=AGENDA&showTitle=0&showPrint=0&showCalendars=0&showTz=0`;
 
 const SUBSCRIBE_URL = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
   CALENDAR_ID
