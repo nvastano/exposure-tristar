@@ -157,7 +157,7 @@ function FootageCard({
 
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3">
-      <div className="aspect-video w-full overflow-hidden rounded">
+      <div className="aspect-[9/16] w-full overflow-hidden rounded">
         <iframe
           className="w-full h-full"
           src={toEmbedUrl(item.VideoUrl)}
