@@ -139,7 +139,7 @@ export default function PracticePlanPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="print:hidden flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-wide">PRACTICE PLAN</h1>
           <p className="text-white/50 text-sm mt-1">
@@ -189,7 +189,7 @@ export default function PracticePlanPage() {
         <p className="text-white/30 text-sm">No practice plans yet.</p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div className="print:hidden flex flex-wrap gap-2">
             {sortedPlans.map((plan) => (
               <button
                 key={plan.Id}
@@ -207,29 +207,73 @@ export default function PracticePlanPage() {
 
           {selectedPlan && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="print:hidden flex items-center justify-between gap-4">
                 <h2 className="text-lg font-bold tracking-wide">{formatDate(selectedPlan.Date)}</h2>
-                <button
-                  onClick={() => handleDeletePlan(selectedPlan)}
-                  className="text-white/40 hover:text-accent text-xs px-1"
-                >
-                  Delete plan
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => window.print()}
+                    className="text-white/40 hover:text-accent text-xs px-1"
+                  >
+                    Print / Save as PDF
+                  </button>
+                  <button
+                    onClick={() => handleDeletePlan(selectedPlan)}
+                    className="text-white/40 hover:text-accent text-xs px-1"
+                  >
+                    Delete plan
+                  </button>
+                </div>
               </div>
 
-              <TimeBudget used={usedMinutes} remaining={remainingMinutes} />
+              <div className="print:hidden">
+                <TimeBudget used={usedMinutes} remaining={remainingMinutes} />
+              </div>
 
               {itemsLoading ? (
                 <LogoLoader />
               ) : (
-                <ItemList items={items} onDelete={handleDeleteItem} />
+                <>
+                  <div className="print:hidden">
+                    <ItemList items={items} onDelete={handleDeleteItem} />
+                  </div>
+                  <PrintablePlan plan={selectedPlan} items={items} usedMinutes={usedMinutes} />
+                </>
               )}
 
-              <AddItemForm library={library} onAdd={handleAddItem} />
+              <div className="print:hidden">
+                <AddItemForm library={library} onAdd={handleAddItem} />
+              </div>
             </div>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function PrintablePlan({
+  plan,
+  items,
+  usedMinutes,
+}: {
+  plan: RawPracticePlanRow;
+  items: RawPracticePlanItemRow[];
+  usedMinutes: number;
+}) {
+  return (
+    <div className="hidden print:block text-black">
+      <h1 className="text-2xl font-bold">{formatDate(plan.Date)} Practice Plan</h1>
+      <p className="text-sm mt-1">
+        {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}m planned of{" "}
+        {PRACTICE_LENGTH_MINUTES / 60}h available
+      </p>
+      <ul className="mt-4 list-disc pl-6">
+        {items.map((item) => (
+          <li key={item.Id} className="mb-1">
+            {item.Name} — {Number(item.Minutes)} min
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-black text-white">
-        <header className="relative border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between">
+        <header className="print:hidden relative border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 min-w-0">
             <Logo size={48} />
             <div className="flex flex-col leading-tight min-w-0">
@@ -42,7 +42,7 @@ export default function RootLayout({
           <NavMenu />
         </header>
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto">{children}</main>
-        <footer className="border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
+        <footer className="print:hidden border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
           <a
             href="https://exposuretristarbb.com/"
             target="_blank"
