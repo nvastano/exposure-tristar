@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 
 const LINKS = [
   { href: "/", label: "DRILLS" },
@@ -11,13 +12,23 @@ const LINKS = [
   { href: "/schedule", label: "SCHEDULE" },
 ];
 
+const COACH_LINK = { href: "/practice-plan", label: "PRACTICE PLAN" };
+
 export default function NavMenu() {
   const [open, setOpen] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    setUnlocked(isCoachUnlocked());
+    return onCoachUnlockChanged(() => setUnlocked(isCoachUnlocked()));
+  }, []);
+
+  const links = unlocked ? [...LINKS, COACH_LINK] : LINKS;
 
   return (
     <>
       <nav className="hidden md:flex items-center gap-5 text-sm font-semibold tracking-wide">
-        {LINKS.map((link) => (
+        {links.map((link) => (
           <Link key={link.href} href={link.href} className="hover:text-accent transition-colors">
             {link.label}
           </Link>
@@ -37,7 +48,7 @@ export default function NavMenu() {
 
       {open && (
         <nav className="md:hidden absolute left-0 right-0 top-full bg-black border-b border-white/10 flex flex-col text-sm font-semibold tracking-wide z-50">
-          {LINKS.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}

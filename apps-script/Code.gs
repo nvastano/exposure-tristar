@@ -12,6 +12,9 @@ var DRILLS_SHEET = "Drills";
 var DRILL_CATEGORIES_SHEET = "DrillCategories";
 var FOOTAGE_SHEET = "Footage";
 var FOOTAGE_NOTES_SHEET = "FootageNotes";
+var PRACTICE_PLAN_DRILLS_SHEET = "PracticePlanDrills";
+var PRACTICE_PLANS_SHEET = "PracticePlans";
+var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -174,6 +177,49 @@ function footageNotesSheet_() {
   return sheet;
 }
 
+function practicePlanDrillsSheet_() {
+  var sheet = getSheet_(PRACTICE_PLAN_DRILLS_SHEET, ["Id", "Name", "CreatedAt"]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
+function practicePlansSheet_() {
+  var sheet = getSheet_(PRACTICE_PLANS_SHEET, ["Id", "Date", "CreatedAt"]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
+function practicePlanItemsSheet_() {
+  var sheet = getSheet_(PRACTICE_PLAN_ITEMS_SHEET, [
+    "Id",
+    "PlanId",
+    "Name",
+    "Minutes",
+    "Order",
+    "CreatedAt",
+  ]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
+// Adds a name to the practice plan drill library the first time a coach
+// types it into a plan, so it shows up as a suggestion next time around.
+function ensurePlanDrill_(name) {
+  var sheet = practicePlanDrillsSheet_();
+  var nameCol = ensureColumn_(sheet, "Name");
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][nameCol - 1]).trim().toLowerCase() === name.trim().toLowerCase()) {
+      return;
+    }
+  }
+  appendRowByHeaders_(sheet, {
+    Id: newId_(),
+    Name: name,
+    CreatedAt: new Date().toISOString(),
+  });
+}
+
 // Returns the next Order value to append an item at the end of a list,
 // where existingOrders is the set of Order values already in use.
 function nextOrder_(existingOrders) {
@@ -265,6 +311,18 @@ function doGet(e) {
       });
     }
     result = allNotes;
+  } else if (action === "practicePlanDrills") {
+    result = rowsToObjects_(practicePlanDrillsSheet_().getDataRange().getValues());
+  } else if (action === "practicePlans") {
+    result = rowsToObjects_(practicePlansSheet_().getDataRange().getValues());
+  } else if (action === "practicePlanItems") {
+    var allPlanItems = rowsToObjects_(practicePlanItemsSheet_().getDataRange().getValues());
+    if (e.parameter.planId) {
+      allPlanItems = allPlanItems.filter(function (row) {
+        return String(row.PlanId) === String(e.parameter.planId);
+      });
+    }
+    result = allPlanItems;
   } else {
     result = { error: "unknown action" };
   }
@@ -568,6 +626,61 @@ function doPost(e) {
           fnSheet2.deleteRow(fni2 + 1);
         }
       }
+      result = { ok: true };
+    }
+  } else if (body.action === "createPracticePlan") {
+    var newPlanId = newId_();
+    appendRowByHeaders_(practicePlansSheet_(), {
+      Id: newPlanId,
+      Date: body.date,
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true, id: newPlanId };
+  } else if (body.action === "deletePracticePlan") {
+    var ppSheet = practicePlansSheet_();
+    var ppRow = findRowById_(ppSheet, body.id);
+    if (ppRow === -1) {
+      result = { error: "practice plan not found" };
+    } else {
+      ppSheet.deleteRow(ppRow);
+      var piSheet = practicePlanItemsSheet_();
+      var piData = piSheet.getDataRange().getValues();
+      var piPlanCol = ensureColumn_(piSheet, "PlanId");
+      for (var pii = piData.length - 1; pii >= 1; pii--) {
+        if (String(piData[pii][piPlanCol - 1]) === String(body.id)) {
+          piSheet.deleteRow(pii + 1);
+        }
+      }
+      result = { ok: true };
+    }
+  } else if (body.action === "addPlanItem") {
+    ensurePlanDrill_(body.name);
+    var itemSheet = practicePlanItemsSheet_();
+    var itemData = itemSheet.getDataRange().getValues();
+    var itemPlanCol = ensureColumn_(itemSheet, "PlanId");
+    var itemOrderCol = ensureColumn_(itemSheet, "Order");
+    var samePlanOrders = [];
+    for (var ii = 1; ii < itemData.length; ii++) {
+      if (String(itemData[ii][itemPlanCol - 1]) === String(body.planId)) {
+        samePlanOrders.push(itemData[ii][itemOrderCol - 1]);
+      }
+    }
+    appendRowByHeaders_(itemSheet, {
+      Id: newId_(),
+      PlanId: body.planId,
+      Name: body.name,
+      Minutes: body.minutes,
+      Order: nextOrder_(samePlanOrders),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "deletePlanItem") {
+    var diSheet = practicePlanItemsSheet_();
+    var diRow = findRowById_(diSheet, body.id);
+    if (diRow === -1) {
+      result = { error: "plan item not found" };
+    } else {
+      diSheet.deleteRow(diRow);
       result = { ok: true };
     }
   } else {
