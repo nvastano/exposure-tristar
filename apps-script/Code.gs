@@ -10,6 +10,8 @@ var ENTRIES_SHEET = "Entries";
 var METRICS_SHEET = "Metrics";
 var DRILLS_SHEET = "Drills";
 var DRILL_CATEGORIES_SHEET = "DrillCategories";
+var FOOTAGE_SHEET = "Footage";
+var FOOTAGE_NOTES_SHEET = "FootageNotes";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -152,6 +154,24 @@ function drillCategoriesSheet_() {
   return sheet;
 }
 
+function footageSheet_() {
+  var sheet = getSheet_(FOOTAGE_SHEET, ["Id", "Title", "VideoUrl", "Date", "CreatedAt"]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
+function footageNotesSheet_() {
+  var sheet = getSheet_(FOOTAGE_NOTES_SHEET, [
+    "Id",
+    "FootageId",
+    "Player",
+    "Note",
+    "CreatedAt",
+  ]);
+  backfillIds_(sheet);
+  return sheet;
+}
+
 // Returns the next Order value to append an item at the end of a list,
 // where existingOrders is the set of Order values already in use.
 function nextOrder_(existingOrders) {
@@ -232,6 +252,17 @@ function doGet(e) {
     result = rowsToObjects_(drillsSheet_().getDataRange().getValues());
   } else if (action === "drillCategories") {
     result = rowsToObjects_(drillCategoriesSheet_().getDataRange().getValues());
+  } else if (action === "footage") {
+    result = rowsToObjects_(footageSheet_().getDataRange().getValues());
+  } else if (action === "footageNotes") {
+    var allNotes = rowsToObjects_(footageNotesSheet_().getDataRange().getValues());
+    if (e.parameter.player) {
+      var np = e.parameter.player.trim().toLowerCase();
+      allNotes = allNotes.filter(function (row) {
+        return String(row.Player).trim().toLowerCase() === np;
+      });
+    }
+    result = allNotes;
   } else {
     result = { error: "unknown action" };
   }
@@ -474,6 +505,54 @@ function doPost(e) {
       }
     });
     result = { ok: true };
+  } else if (body.action === "addFootage") {
+    appendRowByHeaders_(footageSheet_(), {
+      Id: newId_(),
+      Title: body.title,
+      VideoUrl: body.videoUrl,
+      Date: body.date || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "deleteFootage") {
+    var fSheet = footageSheet_();
+    var fRow = findRowById_(fSheet, body.id);
+    if (fRow === -1) {
+      result = { error: "footage not found" };
+    } else {
+      fSheet.deleteRow(fRow);
+      var fnSheet = footageNotesSheet_();
+      var fnData = fnSheet.getDataRange().getValues();
+      var fnFootageCol = ensureColumn_(fnSheet, "FootageId");
+      for (var fni = fnData.length - 1; fni >= 1; fni--) {
+        if (String(fnData[fni][fnFootageCol - 1]) === String(body.id)) {
+          fnSheet.deleteRow(fni + 1);
+        }
+      }
+      result = { ok: true };
+    }
+  } else if (body.action === "addFootageNote") {
+    ensurePlayer_(body.player);
+    appendRowByHeaders_(footageNotesSheet_(), {
+      Id: newId_(),
+      FootageId: body.footageId,
+      Player: body.player,
+      Note: body.note,
+      CreatedAt: new Date().toISOString(),
+    });
+    notifyGroupMe_(
+      body.player + " got called out on a practice clip 🎥\n" + body.note
+    );
+    result = { ok: true };
+  } else if (body.action === "deleteFootageNote") {
+    var fnSheet2 = footageNotesSheet_();
+    var fnRow2 = findRowById_(fnSheet2, body.id);
+    if (fnRow2 === -1) {
+      result = { error: "footage note not found" };
+    } else {
+      fnSheet2.deleteRow(fnRow2);
+      result = { ok: true };
+    }
   } else {
     result = { error: "unknown action" };
   }

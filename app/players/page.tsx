@@ -2,10 +2,12 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { normalizeSessions } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import type { RawMetricRow } from "@/lib/metrics";
+import type { RawFootageNoteRow } from "@/lib/footage";
 import PlayerCharts from "./PlayerCharts";
 import PlayerDailyWork from "@/components/PlayerDailyWork";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
@@ -22,6 +24,7 @@ function PlayerContent() {
   const [numberInput, setNumberInput] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
+  const [footageNotes, setFootageNotes] = useState<RawFootageNoteRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(playerName));
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,10 +34,11 @@ function PlayerContent() {
     if (!playerName) return;
     setLoading(true);
     try {
-      const [players, entries, metricRows] = await Promise.all([
+      const [players, entries, metricRows, notes] = await Promise.all([
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries", { player: playerName }) as Promise<RawEntryRow[]>,
         sheetsGet("metrics", { player: playerName }) as Promise<RawMetricRow[]>,
+        sheetsGet("footageNotes", { player: playerName }) as Promise<RawFootageNoteRow[]>,
       ]);
       const match = players.find(
         (p) => p.Name.trim().toLowerCase() === playerName.trim().toLowerCase()
@@ -42,6 +46,7 @@ function PlayerContent() {
       setPlayer(match || null);
       setSessions(normalizeSessions(entries));
       setMetrics(metricRows);
+      setFootageNotes(notes);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -204,6 +209,22 @@ function PlayerContent() {
         <h2 className="text-lg font-bold tracking-wide">Daily Work</h2>
         <PlayerDailyWork metrics={metrics} canEdit={unlocked} onDelete={handleDeleteMetric} />
       </div>
+
+      {footageNotes.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-wide">Coach Callouts</h2>
+          <div className="flex flex-col gap-2">
+            {footageNotes.map((n) => (
+              <div key={n.Id} className="rounded-lg border border-white/10 p-3 text-sm">
+                <p className="text-white/80">{n.Note}</p>
+                <Link href="/footage" className="text-white/30 text-xs hover:text-accent">
+                  View on Practice Footage
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

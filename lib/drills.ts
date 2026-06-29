@@ -35,5 +35,9 @@ export function toEmbedUrl(videoUrl: string): string {
   if (/(?:facebook\.com|fb\.watch)/.test(trimmed)) {
     return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmed)}&show_text=false`;
   }
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+  const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([\w-]+)/);
+  if (driveOpenMatch) return `https://drive.google.com/file/d/${driveOpenMatch[1]}/preview`;
   return trimmed;
 }
