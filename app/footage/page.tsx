@@ -17,7 +17,34 @@ export default function FootagePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { unlocked, setUnlocked } = useCoachUnlocked();
+
+  const UNDATED = "Undated";
+
+  const dates = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of footage) set.add(item.Date ? formatDate(item.Date) : UNDATED);
+    return Array.from(set).sort((a, b) => {
+      if (a === UNDATED) return 1;
+      if (b === UNDATED) return -1;
+      return b.localeCompare(a);
+    });
+  }, [footage]);
+
+  useEffect(() => {
+    if (dates.length === 0) {
+      setSelectedDate(null);
+    } else if (!selectedDate || !dates.includes(selectedDate)) {
+      setSelectedDate(dates[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dates]);
+
+  const visibleFootage = useMemo(
+    () => footage.filter((item) => (item.Date ? formatDate(item.Date) : UNDATED) === selectedDate),
+    [footage, selectedDate]
+  );
 
   async function refresh() {
     setLoading(true);
@@ -104,23 +131,41 @@ export default function FootagePage() {
       {footage.length === 0 ? (
         <p className="text-white/30 text-sm">No clips uploaded yet.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {footage.map((item) => (
-            <FootageCard
-              key={item.Id}
-              item={item}
-              notes={notes.filter((n) => n.FootageId === item.Id)}
-              players={players}
-              canEdit={unlocked}
-              onDelete={() => handleDeleteFootage(item)}
-              onDeleteNote={handleDeleteNote}
-              onAddNote={async (selectedPlayers, note) => {
-                await sheetsPost("addFootageNote", { footageId: item.Id, players: selectedPlayers, note });
-                refresh();
-              }}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-wrap gap-2">
+            {dates.map((date) => (
+              <button
+                key={date}
+                onClick={() => setSelectedDate(date)}
+                className={`text-sm font-semibold px-4 py-2 rounded-full transition-colors ${
+                  selectedDate === date
+                    ? "bg-accent text-white"
+                    : "bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {date}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {visibleFootage.map((item) => (
+              <FootageCard
+                key={item.Id}
+                item={item}
+                notes={notes.filter((n) => n.FootageId === item.Id)}
+                players={players}
+                canEdit={unlocked}
+                onDelete={() => handleDeleteFootage(item)}
+                onDeleteNote={handleDeleteNote}
+                onAddNote={async (selectedPlayers, note) => {
+                  await sheetsPost("addFootageNote", { footageId: item.Id, players: selectedPlayers, note });
+                  refresh();
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
