@@ -49,7 +49,7 @@ export default function RootLayout({
               PRACTICE STATS
             </Link>
             <Link href="/footage" className="hover:text-accent transition-colors">
-              FOOTAGE
+              COACHING
             </Link>
             <Link href="/schedule" className="hover:text-accent transition-colors">
               SCHEDULE
