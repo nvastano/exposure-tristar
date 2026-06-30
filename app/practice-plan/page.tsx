@@ -10,6 +10,16 @@ import type {
   RawPracticePlanRow,
 } from "@/lib/practicePlan";
 import { DEFAULT_PRACTICE_MINUTES, UNCATEGORIZED } from "@/lib/practicePlan";
+
+const DURATION_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300].map((m) => ({
+  value: m,
+  label:
+    m < 60
+      ? `${m} min`
+      : m % 60 === 0
+      ? `${m / 60} hour${m / 60 > 1 ? "s" : ""}`
+      : `${Math.floor(m / 60)} hour${Math.floor(m / 60) > 1 ? "s" : ""} ${m % 60} min`,
+}));
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 
@@ -188,16 +198,19 @@ export default function PracticePlanPage() {
               className="bg-white/5 border border-white/10 rounded px-3 py-2"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm w-36">
-            Duration (minutes)
-            <input
-              type="number"
-              min={30}
-              step={15}
+          <label className="flex flex-col gap-1 text-sm w-44">
+            Duration
+            <select
               value={newDuration}
               onChange={(e) => setNewDuration(e.target.value)}
               className="bg-white/5 border border-white/10 rounded px-3 py-2"
-            />
+            >
+              {DURATION_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="flex gap-2">
             <button
@@ -366,45 +379,29 @@ function TimeBudget({
   total: number;
   onChangeDuration: (mins: number) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(total));
   const over = remaining < 0;
   const pct = Math.min(100, Math.max(0, (used / total) * 100));
-
-  function commitDuration() {
-    const mins = parseInt(draft, 10);
-    if (Number.isFinite(mins) && mins > 0 && mins !== total) {
-      onChangeDuration(mins);
-    }
-    setEditing(false);
-  }
+  const totalLabel = DURATION_OPTIONS.find((o) => o.value === total)?.label ?? `${total} min`;
 
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-white/60">
+      <div className="flex items-center justify-between text-sm gap-2">
+        <span className="text-white/60 flex items-center gap-1.5 flex-wrap">
           {Math.floor(used / 60)}h {used % 60}m used of{" "}
-          {editing ? (
-            <input
-              type="number"
-              min={30}
-              step={15}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitDuration}
-              onKeyDown={(e) => { if (e.key === "Enter") commitDuration(); if (e.key === "Escape") setEditing(false); }}
-              className="inline w-16 bg-white/10 border border-white/20 rounded px-1 text-white text-center"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => { setDraft(String(total)); setEditing(true); }}
-              className="underline decoration-dotted hover:text-white transition-colors"
-              title="Click to change duration"
-            >
-              {total} min
-            </button>
-          )}
+          <select
+            value={DURATION_OPTIONS.some((o) => o.value === total) ? total : ""}
+            onChange={(e) => onChangeDuration(Number(e.target.value))}
+            className="bg-white/10 border border-white/20 rounded px-2 py-0.5 text-white text-sm"
+          >
+            {!DURATION_OPTIONS.some((o) => o.value === total) && (
+              <option value="">{totalLabel}</option>
+            )}
+            {DURATION_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </span>
         <span className={over ? "text-accent font-semibold" : "text-white/60"}>
           {over
