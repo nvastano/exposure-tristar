@@ -17,6 +17,15 @@ export type RawPracticePlanItemRow = {
   Minutes: string | number;
   Order?: string | number;
   CreatedAt?: string;
+  CategoryId?: string;
+};
+
+export type RawPracticePlanCategoryRow = {
+  Id: string;
+  Name: string;
+  Order?: string | number;
+  CreatedAt?: string;
 };
 
 export const PRACTICE_LENGTH_MINUTES = 240;
+export const UNCATEGORIZED = "Uncategorized";

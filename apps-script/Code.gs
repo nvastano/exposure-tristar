@@ -15,6 +15,7 @@ var FOOTAGE_NOTES_SHEET = "FootageNotes";
 var PRACTICE_PLAN_DRILLS_SHEET = "PracticePlanDrills";
 var PRACTICE_PLANS_SHEET = "PracticePlans";
 var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
+var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -197,7 +198,15 @@ function practicePlanItemsSheet_() {
     "Minutes",
     "Order",
     "CreatedAt",
+    "CategoryId",
   ]);
+  ensureColumn_(sheet, "CategoryId");
+  backfillIds_(sheet);
+  return sheet;
+}
+
+function practicePlanCategoriesSheet_() {
+  var sheet = getSheet_(PRACTICE_PLAN_CATEGORIES_SHEET, ["Id", "Name", "Order", "CreatedAt"]);
   backfillIds_(sheet);
   return sheet;
 }
@@ -315,6 +324,8 @@ function doGet(e) {
     result = rowsToObjects_(practicePlanDrillsSheet_().getDataRange().getValues());
   } else if (action === "practicePlans") {
     result = rowsToObjects_(practicePlansSheet_().getDataRange().getValues());
+  } else if (action === "practicePlanCategories") {
+    result = rowsToObjects_(practicePlanCategoriesSheet_().getDataRange().getValues());
   } else if (action === "practicePlanItems") {
     var allPlanItems = rowsToObjects_(practicePlanItemsSheet_().getDataRange().getValues());
     if (e.parameter.planId) {
@@ -672,6 +683,7 @@ function doPost(e) {
       Minutes: body.minutes,
       Order: nextOrder_(samePlanOrders),
       CreatedAt: new Date().toISOString(),
+      CategoryId: body.categoryId || "",
     });
     result = { ok: true };
   } else if (body.action === "deletePlanItem") {
@@ -681,6 +693,37 @@ function doPost(e) {
       result = { error: "plan item not found" };
     } else {
       diSheet.deleteRow(diRow);
+      result = { ok: true };
+    }
+  } else if (body.action === "addPracticePlanCategory") {
+    var ppcSheet = practicePlanCategoriesSheet_();
+    var ppcData = ppcSheet.getDataRange().getValues();
+    var ppcOrderCol = ensureColumn_(ppcSheet, "Order");
+    var ppcOrders = [];
+    for (var ppci = 1; ppci < ppcData.length; ppci++) ppcOrders.push(ppcData[ppci][ppcOrderCol - 1]);
+    var ppcId = newId_();
+    appendRowByHeaders_(ppcSheet, {
+      Id: ppcId,
+      Name: body.name,
+      Order: nextOrder_(ppcOrders),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true, id: ppcId };
+  } else if (body.action === "deletePracticePlanCategory") {
+    var dpcSheet = practicePlanCategoriesSheet_();
+    var dpcRow = findRowById_(dpcSheet, body.id);
+    if (dpcRow === -1) {
+      result = { error: "category not found" };
+    } else {
+      dpcSheet.deleteRow(dpcRow);
+      var dpiSheet = practicePlanItemsSheet_();
+      var dpiData = dpiSheet.getDataRange().getValues();
+      var dpiCatCol = ensureColumn_(dpiSheet, "CategoryId");
+      for (var dpii = 1; dpii < dpiData.length; dpii++) {
+        if (String(dpiData[dpii][dpiCatCol - 1]) === String(body.id)) {
+          setCell_(dpiSheet, dpii + 1, dpiCatCol, "CategoryId", "");
+        }
+      }
       result = { ok: true };
     }
   } else if (body.action === "seedPracticePlanDrills") {

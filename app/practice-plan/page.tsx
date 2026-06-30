@@ -4,17 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { formatDate, localDateStr } from "@/lib/stats";
 import type {
+  RawPracticePlanCategoryRow,
   RawPracticePlanDrillRow,
   RawPracticePlanItemRow,
   RawPracticePlanRow,
 } from "@/lib/practicePlan";
-import { PRACTICE_LENGTH_MINUTES } from "@/lib/practicePlan";
+import { PRACTICE_LENGTH_MINUTES, UNCATEGORIZED } from "@/lib/practicePlan";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 
 export default function PracticePlanPage() {
   const [plans, setPlans] = useState<RawPracticePlanRow[]>([]);
   const [library, setLibrary] = useState<RawPracticePlanDrillRow[]>([]);
+  const [categories, setCategories] = useState<RawPracticePlanCategoryRow[]>([]);
   const [items, setItems] = useState<RawPracticePlanItemRow[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,12 +37,16 @@ export default function PracticePlanPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const [planData, libraryData] = await Promise.all([
+      const [planData, libraryData, categoryData] = await Promise.all([
         sheetsGet("practicePlans") as Promise<RawPracticePlanRow[]>,
         sheetsGet("practicePlanDrills") as Promise<RawPracticePlanDrillRow[]>,
+        sheetsGet("practicePlanCategories") as Promise<RawPracticePlanCategoryRow[]>,
       ]);
       setPlans(planData);
       setLibrary([...libraryData].sort((a, b) => a.Name.localeCompare(b.Name)));
+      setCategories(
+        [...categoryData].sort((a, b) => Number(a.Order ?? 0) - Number(b.Order ?? 0))
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -96,9 +102,9 @@ export default function PracticePlanPage() {
     refresh();
   }
 
-  async function handleAddItem(name: string, minutes: number) {
+  async function handleAddItem(name: string, minutes: number, categoryId: string) {
     if (!selectedPlanId) return;
-    await sheetsPost("addPlanItem", { planId: selectedPlanId, name, minutes });
+    await sheetsPost("addPlanItem", { planId: selectedPlanId, name, minutes, categoryId });
     await refresh();
     loadItems(selectedPlanId);
   }
@@ -106,6 +112,11 @@ export default function PracticePlanPage() {
   async function handleDeleteItem(id: string) {
     await sheetsPost("deletePlanItem", { id });
     if (selectedPlanId) loadItems(selectedPlanId);
+  }
+
+  async function handleAddCategory(name: string) {
+    await sheetsPost("addPracticePlanCategory", { name });
+    await refresh();
   }
 
   if (!unlocked) {
@@ -234,14 +245,24 @@ export default function PracticePlanPage() {
               ) : (
                 <>
                   <div className="print:hidden">
-                    <ItemList items={items} onDelete={handleDeleteItem} />
+                    <ItemList items={items} categories={categories} onDelete={handleDeleteItem} />
                   </div>
-                  <PrintablePlan plan={selectedPlan} items={items} usedMinutes={usedMinutes} />
+                  <PrintablePlan
+                    plan={selectedPlan}
+                    items={items}
+                    categories={categories}
+                    usedMinutes={usedMinutes}
+                  />
                 </>
               )}
 
               <div className="print:hidden">
-                <AddItemForm library={library} onAdd={handleAddItem} />
+                <AddItemForm
+                  library={library}
+                  categories={categories}
+                  onAdd={handleAddItem}
+                  onAddCategory={handleAddCategory}
+                />
               </div>
             </div>
           )}
@@ -251,15 +272,38 @@ export default function PracticePlanPage() {
   );
 }
 
+function groupItemsByCategory(
+  items: RawPracticePlanItemRow[],
+  categories: RawPracticePlanCategoryRow[]
+) {
+  const groups: { id: string; name: string; items: RawPracticePlanItemRow[] }[] = categories.map(
+    (c) => ({ id: c.Id, name: c.Name, items: [] })
+  );
+  const uncategorized: { id: string; name: string; items: RawPracticePlanItemRow[] } = {
+    id: "",
+    name: UNCATEGORIZED,
+    items: [],
+  };
+  items.forEach((item) => {
+    const group = groups.find((g) => g.id === item.CategoryId);
+    if (group) group.items.push(item);
+    else uncategorized.items.push(item);
+  });
+  return [...groups.filter((g) => g.items.length > 0), ...(uncategorized.items.length ? [uncategorized] : [])];
+}
+
 function PrintablePlan({
   plan,
   items,
+  categories,
   usedMinutes,
 }: {
   plan: RawPracticePlanRow;
   items: RawPracticePlanItemRow[];
+  categories: RawPracticePlanCategoryRow[];
   usedMinutes: number;
 }) {
+  const groups = groupItemsByCategory(items, categories);
   return (
     <div className="hidden print:block text-black">
       <h1 className="text-2xl font-bold">{formatDate(plan.Date)} Practice Plan</h1>
@@ -267,13 +311,18 @@ function PrintablePlan({
         {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}m planned of{" "}
         {PRACTICE_LENGTH_MINUTES / 60}h available
       </p>
-      <ul className="mt-4 list-disc pl-6">
-        {items.map((item) => (
-          <li key={item.Id} className="mb-1">
-            {item.Name} — {Number(item.Minutes)} min
-          </li>
-        ))}
-      </ul>
+      {groups.map((group) => (
+        <div key={group.id || "uncategorized"} className="mt-4">
+          <h2 className="text-lg font-bold">{group.name}</h2>
+          <ul className="mt-1 list-disc pl-6">
+            {group.items.map((item) => (
+              <li key={item.Id} className="mb-1">
+                {item.Name} — {Number(item.Minutes)} min
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
@@ -306,34 +355,45 @@ function TimeBudget({ used, remaining }: { used: number; remaining: number }) {
 
 function ItemList({
   items,
+  categories,
   onDelete,
 }: {
   items: RawPracticePlanItemRow[];
+  categories: RawPracticePlanCategoryRow[];
   onDelete: (id: string) => void;
 }) {
   if (items.length === 0) {
     return <p className="text-white/30 text-sm">No items added yet.</p>;
   }
 
+  const groups = groupItemsByCategory(items, categories);
+
   return (
-    <div className="flex flex-col gap-2">
-      {items.map((item) => (
-        <div
-          key={item.Id}
-          className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-4 py-3"
-        >
-          <span className="font-semibold text-sm">{item.Name}</span>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-white/50 text-sm font-mono">{Number(item.Minutes)} min</span>
-            <button
-              onClick={() => onDelete(item.Id)}
-              className="text-white/40 hover:text-accent text-xs px-1"
-              aria-label="Delete item"
-              title="Delete"
+    <div className="flex flex-col gap-5">
+      {groups.map((group) => (
+        <div key={group.id || "uncategorized"} className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold tracking-wide text-white/40 uppercase">
+            {group.name}
+          </h3>
+          {group.items.map((item) => (
+            <div
+              key={item.Id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-4 py-3"
             >
-              ✕
-            </button>
-          </div>
+              <span className="font-semibold text-sm">{item.Name}</span>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-white/50 text-sm font-mono">{Number(item.Minutes)} min</span>
+                <button
+                  onClick={() => onDelete(item.Id)}
+                  className="text-white/40 hover:text-accent text-xs px-1"
+                  aria-label="Delete item"
+                  title="Delete"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -342,62 +402,132 @@ function ItemList({
 
 function AddItemForm({
   library,
+  categories,
   onAdd,
+  onAddCategory,
 }: {
   library: RawPracticePlanDrillRow[];
-  onAdd: (name: string, minutes: number) => void;
+  categories: RawPracticePlanCategoryRow[];
+  onAdd: (name: string, minutes: number, categoryId: string) => void;
+  onAddCategory: (name: string) => void;
 }) {
   const [name, setName] = useState("");
   const [minutes, setMinutes] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   function handleSave() {
     const mins = parseInt(minutes, 10);
     if (!name.trim() || !Number.isFinite(mins) || mins <= 0) return;
-    onAdd(name.trim(), mins);
+    onAdd(name.trim(), mins, categoryId);
     setName("");
     setMinutes("");
   }
 
+  function handleSaveCategory() {
+    if (!newCategoryName.trim()) return;
+    onAddCategory(newCategoryName.trim());
+    setNewCategoryName("");
+    setAddingCategory(false);
+  }
+
   return (
-    <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-      <label className="flex flex-col gap-1 text-sm flex-1">
-        Drill or activity
-        <input
-          list="practice-plan-drill-library"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Infield Throwing Progressions"
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave();
-          }}
-        />
-        <datalist id="practice-plan-drill-library">
-          {library.map((d) => (
-            <option key={d.Id} value={d.Name} />
-          ))}
-        </datalist>
-      </label>
-      <label className="flex flex-col gap-1 text-sm w-32">
-        Minutes
-        <input
-          type="number"
-          min={1}
-          value={minutes}
-          onChange={(e) => setMinutes(e.target.value)}
-          placeholder="15"
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave();
-          }}
-        />
-      </label>
-      <button
-        onClick={handleSave}
-        className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
-      >
-        Add
-      </button>
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="flex flex-col gap-1 text-sm flex-1">
+          Drill or activity
+          <input
+            list="practice-plan-drill-library"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Infield Throwing Progressions"
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+            }}
+          />
+          <datalist id="practice-plan-drill-library">
+            {library.map((d) => (
+              <option key={d.Id} value={d.Name} />
+            ))}
+          </datalist>
+        </label>
+        <label className="flex flex-col gap-1 text-sm w-44">
+          Category
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+          >
+            <option value="">{UNCATEGORIZED}</option>
+            {categories.map((c) => (
+              <option key={c.Id} value={c.Id}>
+                {c.Name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm w-32">
+          Minutes
+          <input
+            type="number"
+            min={1}
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+            placeholder="15"
+            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+            }}
+          />
+        </label>
+        <button
+          onClick={handleSave}
+          className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+        >
+          Add
+        </button>
+      </div>
+
+      {addingCategory ? (
+        <div className="flex items-end gap-2">
+          <label className="flex flex-col gap-1 text-sm flex-1 max-w-xs">
+            New category name
+            <input
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="e.g. Hitting"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveCategory();
+              }}
+            />
+          </label>
+          <button
+            onClick={handleSaveCategory}
+            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => {
+              setAddingCategory(false);
+              setNewCategoryName("");
+            }}
+            className="text-white/40 hover:text-white text-sm px-2 py-2"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingCategory(true)}
+          className="self-start text-white/40 hover:text-accent text-xs px-1"
+        >
+          + New category
+        </button>
+      )}
     </div>
   );
 }
