@@ -9,7 +9,7 @@ import type {
   RawPracticePlanItemRow,
   RawPracticePlanRow,
 } from "@/lib/practicePlan";
-import { PRACTICE_LENGTH_MINUTES, UNCATEGORIZED } from "@/lib/practicePlan";
+import { DEFAULT_PRACTICE_MINUTES, UNCATEGORIZED } from "@/lib/practicePlan";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 
@@ -24,6 +24,7 @@ export default function PracticePlanPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newDate, setNewDate] = useState(localDateStr());
+  const [newDuration, setNewDuration] = useState(String(DEFAULT_PRACTICE_MINUTES));
   const { unlocked, setUnlocked } = useCoachUnlocked();
 
   const sortedPlans = useMemo(
@@ -89,10 +90,17 @@ export default function PracticePlanPage() {
 
   async function handleCreatePlan() {
     if (!newDate) return;
-    const res = (await sheetsPost("createPracticePlan", { date: newDate })) as { id: string };
+    const durationMinutes = parseInt(newDuration, 10) || DEFAULT_PRACTICE_MINUTES;
+    const res = (await sheetsPost("createPracticePlan", { date: newDate, durationMinutes })) as { id: string };
     setCreating(false);
+    setNewDuration(String(DEFAULT_PRACTICE_MINUTES));
     await refresh();
     setSelectedPlanId(res.id);
+  }
+
+  async function handleUpdateDuration(id: string, durationMinutes: number) {
+    await sheetsPost("updatePracticePlan", { id, durationMinutes });
+    await refresh();
   }
 
   async function handleDeletePlan(plan: RawPracticePlanRow) {
@@ -145,8 +153,9 @@ export default function PracticePlanPage() {
   }
 
   const selectedPlan = sortedPlans.find((p) => p.Id === selectedPlanId) || null;
+  const planDuration = Number(selectedPlan?.DurationMinutes) || DEFAULT_PRACTICE_MINUTES;
   const usedMinutes = items.reduce((sum, i) => sum + (Number(i.Minutes) || 0), 0);
-  const remainingMinutes = PRACTICE_LENGTH_MINUTES - usedMinutes;
+  const remainingMinutes = planDuration - usedMinutes;
 
   return (
     <div className="flex flex-col gap-8">
@@ -176,6 +185,17 @@ export default function PracticePlanPage() {
               type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm w-36">
+            Duration (minutes)
+            <input
+              type="number"
+              min={30}
+              step={15}
+              value={newDuration}
+              onChange={(e) => setNewDuration(e.target.value)}
               className="bg-white/5 border border-white/10 rounded px-3 py-2"
             />
           </label>
@@ -237,7 +257,12 @@ export default function PracticePlanPage() {
               </div>
 
               <div className="print:hidden">
-                <TimeBudget used={usedMinutes} remaining={remainingMinutes} />
+                <TimeBudget
+                  used={usedMinutes}
+                  remaining={remainingMinutes}
+                  total={planDuration}
+                  onChangeDuration={(mins) => handleUpdateDuration(selectedPlan.Id, mins)}
+                />
               </div>
 
               {itemsLoading ? (
@@ -252,6 +277,7 @@ export default function PracticePlanPage() {
                     items={items}
                     categories={categories}
                     usedMinutes={usedMinutes}
+                    totalMinutes={planDuration}
                   />
                 </>
               )}
@@ -297,11 +323,13 @@ function PrintablePlan({
   items,
   categories,
   usedMinutes,
+  totalMinutes,
 }: {
   plan: RawPracticePlanRow;
   items: RawPracticePlanItemRow[];
   categories: RawPracticePlanCategoryRow[];
   usedMinutes: number;
+  totalMinutes: number;
 }) {
   const groups = groupItemsByCategory(items, categories);
   return (
@@ -309,7 +337,7 @@ function PrintablePlan({
       <h1 className="text-2xl font-bold">{formatDate(plan.Date)} Practice Plan</h1>
       <p className="text-sm mt-1">
         {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}m planned of{" "}
-        {PRACTICE_LENGTH_MINUTES / 60}h available
+        {totalMinutes} min available
       </p>
       {groups.map((group) => (
         <div key={group.id || "uncategorized"} className="mt-4">
@@ -327,15 +355,56 @@ function PrintablePlan({
   );
 }
 
-function TimeBudget({ used, remaining }: { used: number; remaining: number }) {
+function TimeBudget({
+  used,
+  remaining,
+  total,
+  onChangeDuration,
+}: {
+  used: number;
+  remaining: number;
+  total: number;
+  onChangeDuration: (mins: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(total));
   const over = remaining < 0;
-  const pct = Math.min(100, Math.max(0, (used / PRACTICE_LENGTH_MINUTES) * 100));
+  const pct = Math.min(100, Math.max(0, (used / total) * 100));
+
+  function commitDuration() {
+    const mins = parseInt(draft, 10);
+    if (Number.isFinite(mins) && mins > 0 && mins !== total) {
+      onChangeDuration(mins);
+    }
+    setEditing(false);
+  }
 
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-2">
       <div className="flex items-center justify-between text-sm">
         <span className="text-white/60">
-          {Math.floor(used / 60)}h {used % 60}m used of {PRACTICE_LENGTH_MINUTES / 60}h
+          {Math.floor(used / 60)}h {used % 60}m used of{" "}
+          {editing ? (
+            <input
+              type="number"
+              min={30}
+              step={15}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitDuration}
+              onKeyDown={(e) => { if (e.key === "Enter") commitDuration(); if (e.key === "Escape") setEditing(false); }}
+              className="inline w-16 bg-white/10 border border-white/20 rounded px-1 text-white text-center"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => { setDraft(String(total)); setEditing(true); }}
+              className="underline decoration-dotted hover:text-white transition-colors"
+              title="Click to change duration"
+            >
+              {total} min
+            </button>
+          )}
         </span>
         <span className={over ? "text-accent font-semibold" : "text-white/60"}>
           {over

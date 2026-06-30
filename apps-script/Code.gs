@@ -185,7 +185,8 @@ function practicePlanDrillsSheet_() {
 }
 
 function practicePlansSheet_() {
-  var sheet = getSheet_(PRACTICE_PLANS_SHEET, ["Id", "Date", "CreatedAt"]);
+  var sheet = getSheet_(PRACTICE_PLANS_SHEET, ["Id", "Date", "CreatedAt", "DurationMinutes"]);
+  ensureColumn_(sheet, "DurationMinutes");
   backfillIds_(sheet);
   return sheet;
 }
@@ -644,9 +645,21 @@ function doPost(e) {
     appendRowByHeaders_(practicePlansSheet_(), {
       Id: newPlanId,
       Date: body.date,
+      DurationMinutes: body.durationMinutes || 240,
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true, id: newPlanId };
+  } else if (body.action === "updatePracticePlan") {
+    var upSheet = practicePlansSheet_();
+    var upRow = findRowById_(upSheet, body.id);
+    if (upRow === -1) {
+      result = { error: "practice plan not found" };
+    } else {
+      var upUpdates = {};
+      if (body.durationMinutes !== undefined) upUpdates.DurationMinutes = body.durationMinutes;
+      setRowByHeaders_(upSheet, upRow, upUpdates);
+      result = { ok: true };
+    }
   } else if (body.action === "deletePracticePlan") {
     var ppSheet = practicePlansSheet_();
     var ppRow = findRowById_(ppSheet, body.id);
