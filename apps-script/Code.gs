@@ -200,8 +200,10 @@ function practicePlanItemsSheet_() {
     "Order",
     "CreatedAt",
     "CategoryId",
+    "VideoUrl",
   ]);
   ensureColumn_(sheet, "CategoryId");
+  ensureColumn_(sheet, "VideoUrl");
   backfillIds_(sheet);
   return sheet;
 }
@@ -697,8 +699,20 @@ function doPost(e) {
       Order: nextOrder_(samePlanOrders),
       CreatedAt: new Date().toISOString(),
       CategoryId: body.categoryId || "",
+      VideoUrl: body.videoUrl || "",
     });
     result = { ok: true };
+  } else if (body.action === "updatePlanItem") {
+    var upiSheet = practicePlanItemsSheet_();
+    var upiRow = findRowById_(upiSheet, body.id);
+    if (upiRow === -1) {
+      result = { error: "plan item not found" };
+    } else {
+      var upiUpdates = {};
+      if (body.videoUrl !== undefined) upiUpdates.VideoUrl = body.videoUrl;
+      setRowByHeaders_(upiSheet, upiRow, upiUpdates);
+      result = { ok: true };
+    }
   } else if (body.action === "deletePlanItem") {
     var diSheet = practicePlanItemsSheet_();
     var diRow = findRowById_(diSheet, body.id);

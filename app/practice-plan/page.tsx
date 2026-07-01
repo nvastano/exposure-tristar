@@ -120,15 +120,20 @@ export default function PracticePlanPage() {
     refresh();
   }
 
-  async function handleAddItem(name: string, minutes: number, categoryId: string) {
+  async function handleAddItem(name: string, minutes: number, categoryId: string, videoUrl: string) {
     if (!selectedPlanId) return;
-    await sheetsPost("addPlanItem", { planId: selectedPlanId, name, minutes, categoryId });
+    await sheetsPost("addPlanItem", { planId: selectedPlanId, name, minutes, categoryId, videoUrl });
     await refresh();
     loadItems(selectedPlanId);
   }
 
   async function handleDeleteItem(id: string) {
     await sheetsPost("deletePlanItem", { id });
+    if (selectedPlanId) loadItems(selectedPlanId);
+  }
+
+  async function handleUpdateItemVideo(id: string, videoUrl: string) {
+    await sheetsPost("updatePlanItem", { id, videoUrl });
     if (selectedPlanId) loadItems(selectedPlanId);
   }
 
@@ -283,7 +288,12 @@ export default function PracticePlanPage() {
               ) : (
                 <>
                   <div className="print:hidden">
-                    <ItemList items={items} categories={categories} onDelete={handleDeleteItem} />
+                    <ItemList
+                      items={items}
+                      categories={categories}
+                      onDelete={handleDeleteItem}
+                      onUpdateVideo={handleUpdateItemVideo}
+                    />
                   </div>
                   <PrintablePlan
                     plan={selectedPlan}
@@ -359,6 +369,11 @@ function PrintablePlan({
             {group.items.map((item) => (
               <li key={item.Id} className="mb-1">
                 {item.Name} — {Number(item.Minutes)} min
+                {item.VideoUrl && (
+                  <span className="ml-2 text-xs">
+                    (<a href={item.VideoUrl} className="underline">{item.VideoUrl}</a>)
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -419,14 +434,88 @@ function TimeBudget({
   );
 }
 
+function ItemRow({
+  item,
+  onDelete,
+  onUpdateVideo,
+}: {
+  item: RawPracticePlanItemRow;
+  onDelete: (id: string) => void;
+  onUpdateVideo: (id: string, url: string) => void;
+}) {
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlDraft, setUrlDraft] = useState(item.VideoUrl || "");
+
+  function commitUrl() {
+    onUpdateVideo(item.Id, urlDraft.trim());
+    setEditingUrl(false);
+  }
+
+  return (
+    <div className="rounded-lg border border-white/10">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <span className="font-semibold text-sm">{item.Name}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-white/50 text-sm font-mono">{Number(item.Minutes)} min</span>
+          <button
+            onClick={() => { setUrlDraft(item.VideoUrl || ""); setEditingUrl((v) => !v); }}
+            className={`text-xs px-1 transition-colors ${item.VideoUrl ? "text-accent hover:text-accent/70" : "text-white/40 hover:text-accent"}`}
+            aria-label="Video link"
+            title={item.VideoUrl ? "Edit video link" : "Add video link"}
+          >
+            ▶
+          </button>
+          <button
+            onClick={() => onDelete(item.Id)}
+            className="text-white/40 hover:text-accent text-xs px-1"
+            aria-label="Delete item"
+            title="Delete"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      {editingUrl && (
+        <div className="px-4 pb-3 flex items-center gap-2">
+          <input
+            type="url"
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            placeholder="https://youtube.com/..."
+            className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm"
+            onKeyDown={(e) => { if (e.key === "Enter") commitUrl(); if (e.key === "Escape") setEditingUrl(false); }}
+            autoFocus
+          />
+          <button onClick={commitUrl} className="text-accent text-sm font-semibold px-2">Save</button>
+          <button onClick={() => setEditingUrl(false)} className="text-white/40 text-sm px-1">Cancel</button>
+        </div>
+      )}
+      {!editingUrl && item.VideoUrl && (
+        <div className="px-4 pb-3">
+          <a
+            href={item.VideoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-accent hover:underline truncate block max-w-full"
+          >
+            {item.VideoUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ItemList({
   items,
   categories,
   onDelete,
+  onUpdateVideo,
 }: {
   items: RawPracticePlanItemRow[];
   categories: RawPracticePlanCategoryRow[];
   onDelete: (id: string) => void;
+  onUpdateVideo: (id: string, url: string) => void;
 }) {
   if (items.length === 0) {
     return <p className="text-white/30 text-sm">No items added yet.</p>;
@@ -442,23 +531,7 @@ function ItemList({
             {group.name}
           </h3>
           {group.items.map((item) => (
-            <div
-              key={item.Id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-4 py-3"
-            >
-              <span className="font-semibold text-sm">{item.Name}</span>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-white/50 text-sm font-mono">{Number(item.Minutes)} min</span>
-                <button
-                  onClick={() => onDelete(item.Id)}
-                  className="text-white/40 hover:text-accent text-xs px-1"
-                  aria-label="Delete item"
-                  title="Delete"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+            <ItemRow key={item.Id} item={item} onDelete={onDelete} onUpdateVideo={onUpdateVideo} />
           ))}
         </div>
       ))}
@@ -474,19 +547,21 @@ function AddItemForm({
 }: {
   library: RawPracticePlanDrillRow[];
   categories: RawPracticePlanCategoryRow[];
-  onAdd: (name: string, minutes: number, categoryId: string) => void;
+  onAdd: (name: string, minutes: number, categoryId: string, videoUrl: string) => void;
   onAddCategory: (name: string) => void;
 }) {
   const [name, setName] = useState("");
   const [minutes, setMinutes] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
 
   function handleSave() {
     const mins = parseInt(minutes, 10);
     if (!name.trim() || !Number.isFinite(mins) || mins <= 0) return;
-    onAdd(name.trim(), mins, categoryId);
+    onAdd(name.trim(), mins, categoryId, videoUrl.trim());
+    setVideoUrl("");
     setName("");
     setMinutes("");
   }
@@ -500,60 +575,72 @@ function AddItemForm({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-col gap-1 text-sm flex-1">
-          Drill or activity
-          <input
-            list="practice-plan-drill-library"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Infield Throwing Progressions"
-            className="bg-white/5 border border-white/10 rounded px-3 py-2"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-            }}
-          />
-          <datalist id="practice-plan-drill-library">
-            {library.map((d) => (
-              <option key={d.Id} value={d.Name} />
-            ))}
-          </datalist>
-        </label>
-        <label className="flex flex-col gap-1 text-sm w-44">
-          Category
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded px-3 py-2"
+      <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex flex-col gap-1 text-sm flex-1">
+            Drill or activity
+            <input
+              list="practice-plan-drill-library"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Infield Throwing Progressions"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+              }}
+            />
+            <datalist id="practice-plan-drill-library">
+              {library.map((d) => (
+                <option key={d.Id} value={d.Name} />
+              ))}
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-1 text-sm w-44">
+            Category
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+            >
+              <option value="">{UNCATEGORIZED}</option>
+              {categories.map((c) => (
+                <option key={c.Id} value={c.Id}>
+                  {c.Name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm w-32">
+            Minutes
+            <input
+              type="number"
+              min={1}
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              placeholder="15"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+              }}
+            />
+          </label>
+          <button
+            onClick={handleSave}
+            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
           >
-            <option value="">{UNCATEGORIZED}</option>
-            {categories.map((c) => (
-              <option key={c.Id} value={c.Id}>
-                {c.Name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm w-32">
-          Minutes
+            Add
+          </button>
+        </div>
+        <label className="flex flex-col gap-1 text-sm">
+          Video link <span className="text-white/30 font-normal">(optional)</span>
           <input
-            type="number"
-            min={1}
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            placeholder="15"
+            type="url"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://youtube.com/..."
             className="bg-white/5 border border-white/10 rounded px-3 py-2"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-            }}
           />
         </label>
-        <button
-          onClick={handleSave}
-          className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
-        >
-          Add
-        </button>
       </div>
 
       {addingCategory ? (

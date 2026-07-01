@@ -19,6 +19,7 @@ export type RawPracticePlanItemRow = {
   Order?: string | number;
   CreatedAt?: string;
   CategoryId?: string;
+  VideoUrl?: string;
 };
 
 export type RawPracticePlanCategoryRow = {
