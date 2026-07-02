@@ -109,8 +109,10 @@ export default function PracticePlanPage() {
   }
 
   async function handleUpdateDuration(id: string, durationMinutes: number) {
+    setPlans((prev) =>
+      prev.map((p) => (p.Id === id ? { ...p, DurationMinutes: durationMinutes } : p))
+    );
     await sheetsPost("updatePracticePlan", { id, durationMinutes });
-    await refresh();
   }
 
   async function handleDeletePlan(plan: RawPracticePlanRow) {
