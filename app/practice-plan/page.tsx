@@ -614,6 +614,7 @@ function AddItemForm({
             Minutes
             <input
               type="number"
+              inputMode="numeric"
               min={1}
               value={minutes}
               onChange={(e) => setMinutes(e.target.value)}

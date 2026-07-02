@@ -151,6 +151,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
                     {def.unit && <span className="text-white/30 text-xs">{def.unit}</span>}
                     <input
                       type="number"
+                      inputMode="numeric"
                       value={(metricValues[def.key] as string) || ""}
                       onChange={(e) =>
                         setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))

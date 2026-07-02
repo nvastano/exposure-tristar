@@ -147,6 +147,7 @@ export default function CoachEntryForm({ onSaved }: { onSaved?: () => void }) {
         {statType === "sprint" ? "Sprint time (s)" : "Throw velocity (mph)"}
         <input
           type="number"
+          inputMode="decimal"
           step="0.01"
           value={value}
           onChange={(e) => setValue(e.target.value)}
