@@ -511,9 +511,13 @@ function DrillCard({
     );
   }
 
+  const isNew =
+    !!drill.CreatedAt &&
+    Date.now() - new Date(drill.CreatedAt).getTime() < 7 * 24 * 60 * 60 * 1000;
+
   return (
     <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-3">
-      <div className="aspect-video w-full overflow-hidden rounded">
+      <div className="relative aspect-video w-full overflow-hidden rounded">
         <iframe
           className="w-full h-full"
           src={toEmbedUrl(drill.VideoUrl)}
@@ -521,6 +525,11 @@ function DrillCard({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
+        {isNew && (
+          <span className="absolute top-2 left-2 bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            NEW
+          </span>
+        )}
       </div>
       <div className="flex items-start justify-between gap-2">
         <div>

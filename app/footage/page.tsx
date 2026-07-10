@@ -82,6 +82,18 @@ export default function FootagePage() {
     refresh();
   }
 
+  if (!unlocked) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <h1 className="text-xl font-bold tracking-wide">COACHES ONLY</h1>
+        <p className="text-white/50 text-sm max-w-sm">
+          Practice footage and player callouts are restricted to coaches. Log in to view.
+        </p>
+        <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
+      </div>
+    );
+  }
+
   if (loading) {
     return <LogoLoader />;
   }
@@ -101,20 +113,17 @@ export default function FootagePage() {
         <div>
           <h2 className="text-xl font-bold tracking-wide">PRACTICE FOOTAGE</h2>
           <p className="text-white/50 text-sm mt-1">
-            Clips from practice — coaches can call out players by name on anything they notice.
+            Clips from practice — call out players by name on anything you notice.
           </p>
         </div>
-        <div className="flex items-end gap-2 shrink-0">
-          <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
-          {unlocked && !adding && (
-            <button
-              onClick={() => setAdding(true)}
-              className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
-            >
-              + Add Clip
-            </button>
-          )}
-        </div>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded shrink-0"
+          >
+            + Add Clip
+          </button>
+        )}
       </div>
 
       {unlocked && adding && (
@@ -155,7 +164,7 @@ export default function FootagePage() {
                 item={item}
                 notes={notes.filter((n) => n.FootageId === item.Id)}
                 players={players}
-                canEdit={unlocked}
+                canEdit={true}
                 onDelete={() => handleDeleteFootage(item)}
                 onDeleteNote={handleDeleteNote}
                 onAddNote={async (selectedPlayers, note) => {
