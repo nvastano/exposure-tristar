@@ -24,7 +24,7 @@ export default function DailyPage() {
       const [playersData, metricsData, triviaData] = await Promise.all([
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("metrics") as Promise<RawMetricRow[]>,
-        sheetsGet("triviaResponses").catch(() => []) as Promise<TriviaResponseRow[]>,
+        sheetsGet("triviaResponses").then((d) => (Array.isArray(d) ? d : [])).catch(() => []) as Promise<TriviaResponseRow[]>,
       ]);
       setPlayers(playersData);
       setMetrics(metricsData);
