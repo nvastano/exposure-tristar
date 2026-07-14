@@ -16,6 +16,7 @@ var PRACTICE_PLAN_DRILLS_SHEET = "PracticePlanDrills";
 var PRACTICE_PLANS_SHEET = "PracticePlans";
 var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
 var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
+var TRIVIA_RESPONSES_SHEET = "TriviaResponses";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -753,6 +754,19 @@ function doPost(e) {
       }
       result = { ok: true };
     }
+  } else if (body.action === "recordTriviaResponse") {
+    var trSheet = getSheet_(TRIVIA_RESPONSES_SHEET, ["Id", "Player", "QuestionId", "Answer", "Correct", "Date", "CreatedAt"]);
+    backfillIds_(trSheet);
+    appendRowByHeaders_(trSheet, {
+      Id: newId_(),
+      Player: body.player,
+      QuestionId: body.questionId,
+      Answer: body.answer,
+      Correct: body.correct ? "yes" : "no",
+      Date: body.date || new Date().toISOString().slice(0, 10),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
   } else if (body.action === "seedPracticePlanDrills") {
     (body.names || []).forEach(function (n) {
       ensurePlanDrill_(n);

@@ -7,6 +7,7 @@ import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 const LINKS = [
   { href: "/", label: "DRILLS" },
   { href: "/daily-work", label: "DAILY WORK" },
+  { href: "/situations", label: "SITUATIONS" },
   { href: "/practice", label: "PRACTICE STATS" },
   { href: "/footage", label: "COACHING" },
   { href: "/schedule", label: "SCHEDULE" },

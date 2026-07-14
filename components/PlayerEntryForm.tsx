@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { METRIC_CATEGORIES, METRIC_DEFS } from "@/lib/metrics";
 import { localDateStr } from "@/lib/stats";
+import { getRandomQuestion } from "@/lib/trivia";
+import TriviaQuestionCard from "@/components/TriviaQuestion";
 
 const TODAY = localDateStr();
 
@@ -20,6 +22,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [drillsDone, setDrillsDone] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const triviaQuestion = useMemo(() => getRandomQuestion(), []);
 
   useEffect(() => {
     (async () => {
@@ -113,6 +116,10 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
           ))}
         </select>
       </label>
+
+      {player && (
+        <TriviaQuestionCard question={triviaQuestion} player={player} />
+      )}
 
       <label className="flex flex-col gap-1 text-sm w-48">
         Date
