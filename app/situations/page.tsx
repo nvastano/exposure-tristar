@@ -125,7 +125,7 @@ export default function SituationsPage() {
                     : "border-white/10"
                 }`}
               >
-                <option value="" disabled>
+                <option value="">
                   Select assignment for {POSITION_LABELS[pos]}…
                 </option>
                 {shuffledOptions.map((opt) => {
