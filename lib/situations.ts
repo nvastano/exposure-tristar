@@ -10,10 +10,23 @@ export type FieldPositions = {
   RF: string;
 };
 
+// SVG coordinate system (viewBox "0 0 280 260"):
+//   Home plate: (140, 228)   1B: (214, 156)
+//   2B: (140, 84)            3B: (66, 156)
+//   Pitcher's mound: (140, 158)
+//   LF: (42, 50)   CF: (140, 28)   RF: (238, 50)
+export type SituationVisual = {
+  runners: number[];           // bases occupied: 1, 2, and/or 3
+  outs: number;                // 0, 1, or 2
+  ball: { x: number; y: number; label: string };
+  ballFrom?: { x: number; y: number }; // origin of throw if not from home
+};
+
 export type Situation = {
   id: string;
   title: string;
   description: string;
+  visual: SituationVisual;
   answers: FieldPositions;
 };
 
@@ -23,6 +36,11 @@ export const SITUATIONS: Situation[] = [
     title: "Runner on 1st — Ground Ball to Shortstop",
     description:
       "Runner on 1st base only, no outs. The batter hits a ground ball to the shortstop. Where does each player go?",
+    visual: {
+      runners: [1],
+      outs: 0,
+      ball: { x: 96, y: 138, label: "Ground ball to SS" },
+    },
     answers: {
       P: "Break toward 1st base to back up the throw",
       C: "Stay at home plate in case of an overthrow",
@@ -40,6 +58,11 @@ export const SITUATIONS: Situation[] = [
     title: "Runner on 2nd — Fly Ball to Right Field",
     description:
       "Runner on 2nd base only, less than 2 outs. The batter hits a fly ball to right field. Where does each player go?",
+    visual: {
+      runners: [2],
+      outs: 1,
+      ball: { x: 238, y: 50, label: "Fly ball to RF" },
+    },
     answers: {
       P: "Hustle to back up 3rd base in case the runner tags and advances",
       C: "Cover home plate — runner may tag and score",
@@ -57,6 +80,11 @@ export const SITUATIONS: Situation[] = [
     title: "Bases Loaded — Ground Ball to Pitcher",
     description:
       "Bases loaded, no outs. Batter hits a ground ball right back to the pitcher. Where does each player go?",
+    visual: {
+      runners: [1, 2, 3],
+      outs: 0,
+      ball: { x: 140, y: 158, label: "Ground ball to P" },
+    },
     answers: {
       P: "Field the ball, throw home to start a double play (home-to-1st)",
       C: "Catch throw from pitcher, apply tag if needed, then throw to 1st",
@@ -74,6 +102,11 @@ export const SITUATIONS: Situation[] = [
     title: "No Runners — Ground Ball Down the 1st Base Line",
     description:
       "Bases empty. The batter hits a sharp ground ball down the 1st base line. Where does each player go?",
+    visual: {
+      runners: [],
+      outs: 0,
+      ball: { x: 226, y: 185, label: "Ground ball down 1B line" },
+    },
     answers: {
       P: "Sprint to cover 1st base — the 1B will field the ball",
       C: "Back up 1st base on an overthrow",
@@ -91,6 +124,12 @@ export const SITUATIONS: Situation[] = [
     title: "Runner on 3rd — Wild Pitch / Passed Ball",
     description:
       "Runner on 3rd base, any count. The pitch gets past the catcher. Where does each player go?",
+    visual: {
+      runners: [3],
+      outs: 1,
+      ball: { x: 155, y: 248, label: "Wild pitch — ball past catcher" },
+      ballFrom: { x: 140, y: 158 },
+    },
     answers: {
       P: "Sprint to cover home plate immediately",
       C: "Scramble to retrieve the ball, look to throw to the pitcher covering the plate",
@@ -108,6 +147,11 @@ export const SITUATIONS: Situation[] = [
     title: "Runners on 1st and 2nd — Fly Ball to Left Field",
     description:
       "Runners on 1st and 2nd, less than 2 outs. The batter hits a fly ball to left field. Where does each player go?",
+    visual: {
+      runners: [1, 2],
+      outs: 1,
+      ball: { x: 42, y: 50, label: "Fly ball to LF" },
+    },
     answers: {
       P: "Back up 3rd base — runner on 2nd will likely tag and advance",
       C: "Cover home plate — runner on 2nd may score if the throw goes to 3rd",
@@ -125,6 +169,12 @@ export const SITUATIONS: Situation[] = [
     title: "Runner on 1st — Stolen Base Attempt",
     description:
       "Runner on 1st base takes off to steal 2nd. Where does each player go on the pitch?",
+    visual: {
+      runners: [1],
+      outs: 1,
+      ball: { x: 140, y: 84, label: "Throw to 2nd base" },
+      ballFrom: { x: 140, y: 228 },
+    },
     answers: {
       P: "Deliver the pitch quickly; be ready to back up 2nd if the throw goes through",
       C: "Receive pitch and fire a throw to 2nd base",
@@ -142,6 +192,11 @@ export const SITUATIONS: Situation[] = [
     title: "No Runners — Base Hit to Center Field",
     description:
       "Bases empty. Batter hits a single to center field. Where does each player go?",
+    visual: {
+      runners: [],
+      outs: 0,
+      ball: { x: 140, y: 38, label: "Single to CF" },
+    },
     answers: {
       P: "Back up 2nd base from behind the mound in case of an overthrow",
       C: "Stay at home plate",
@@ -159,6 +214,11 @@ export const SITUATIONS: Situation[] = [
     title: "Runner on 2nd — Ground Ball to Third Baseman",
     description:
       "Runner on 2nd base, no outs. The batter hits a ground ball to the third baseman. Where does each player go?",
+    visual: {
+      runners: [2],
+      outs: 0,
+      ball: { x: 72, y: 148, label: "Ground ball to 3B" },
+    },
     answers: {
       P: "Break toward 1st base to back up the throw",
       C: "Cover home plate — runner on 2nd may attempt to score on a wild throw",
@@ -173,9 +233,14 @@ export const SITUATIONS: Situation[] = [
   },
   {
     id: "s10",
-    title: "Runner on 3rd — Less Than 2 Outs, Fly Ball to Outfield",
+    title: "Runner on 3rd — Tag-Up, Fly Ball to Center",
     description:
       "Runner on 3rd, less than 2 outs. The batter hits a deep fly ball to center field. Tag-up situation. Where does each player go?",
+    visual: {
+      runners: [3],
+      outs: 1,
+      ball: { x: 140, y: 28, label: "Deep fly ball to CF" },
+    },
     answers: {
       P: "Sprint to cover home plate — the runner will tag and try to score",
       C: "Cover home plate; be ready to receive the throw and apply the tag",
