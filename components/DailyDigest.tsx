@@ -111,7 +111,7 @@ export default function DailyDigest({
                 {(() => {
                   const trivia = triviaByPlayer.get(player.Name);
                   if (!trivia) return null;
-                  const correct = trivia.Correct === "true" || trivia.Correct === "TRUE";
+                  const correct = trivia.Correct === "true" || trivia.Correct === "TRUE" || trivia.Correct === "yes";
                   return (
                     <div className={`flex items-center gap-2 text-xs rounded px-2 py-1.5 border mt-1 ${correct ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-white/5 border-white/10 text-white/50"}`}>
                       <span>{correct ? "✓" : "✗"}</span>
