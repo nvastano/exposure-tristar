@@ -8,13 +8,16 @@ import { formatDate, localDateStr } from "@/lib/stats";
 import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
+type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
 
 export default function DailyDigest({
   players,
   metrics,
+  triviaResponses = [],
 }: {
   players: PlayerRow[];
   metrics: RawMetricRow[];
+  triviaResponses?: TriviaResponseRow[];
 }) {
   const today = localDateStr();
 
@@ -35,6 +38,14 @@ export default function DailyDigest({
     }
     return map;
   }, [metrics, selectedDate]);
+
+  const triviaByPlayer = useMemo(() => {
+    const map = new Map<string, TriviaResponseRow>();
+    for (const r of triviaResponses) {
+      if (formatDate(r.Date) === selectedDate) map.set(r.Player, r);
+    }
+    return map;
+  }, [triviaResponses, selectedDate]);
 
   const playersWithWork = players.filter((p) => (byPlayer.get(p.Name) || []).length > 0);
 
@@ -97,6 +108,18 @@ export default function DailyDigest({
                     );
                   })}
                 </ul>
+                {(() => {
+                  const trivia = triviaByPlayer.get(player.Name);
+                  if (!trivia) return null;
+                  const correct = trivia.Correct === "true" || trivia.Correct === "TRUE";
+                  return (
+                    <div className={`flex items-center gap-2 text-xs rounded px-2 py-1.5 border mt-1 ${correct ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-white/5 border-white/10 text-white/50"}`}>
+                      <span>{correct ? "✓" : "✗"}</span>
+                      <span className="font-semibold">Trivia</span>
+                      <span className="text-white/40">{correct ? "Got it right" : "Missed it"}</span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

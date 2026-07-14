@@ -330,6 +330,8 @@ function doGet(e) {
     result = rowsToObjects_(practicePlansSheet_().getDataRange().getValues());
   } else if (action === "practicePlanCategories") {
     result = rowsToObjects_(practicePlanCategoriesSheet_().getDataRange().getValues());
+  } else if (action === "triviaResponses") {
+    result = rowsToObjects_(getSheet_(TRIVIA_RESPONSES_SHEET, ["Id", "Player", "QuestionId", "Answer", "Correct", "Date", "CreatedAt"]).getDataRange().getValues());
   } else if (action === "practicePlanItems") {
     var allPlanItems = rowsToObjects_(practicePlanItemsSheet_().getDataRange().getValues());
     if (e.parameter.planId) {
