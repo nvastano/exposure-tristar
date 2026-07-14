@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SITUATIONS } from "@/lib/situations";
 import type { FieldPositions } from "@/lib/situations";
 import DiamondView from "@/components/DiamondView";
@@ -18,12 +18,28 @@ const POSITION_LABELS: Record<keyof FieldPositions, string> = {
   RF: "Right Fielder",
 };
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function SituationsPage() {
   const [selectedId, setSelectedId] = useState(SITUATIONS[0].id);
   const [answers, setAnswers] = useState<Partial<FieldPositions>>({});
   const [submitted, setSubmitted] = useState(false);
 
   const situation = SITUATIONS.find((s) => s.id === selectedId)!;
+
+  // Shuffled answer options — re-shuffle whenever the situation changes
+  const shuffledOptions = useMemo(
+    () => shuffle(POSITIONS.map((p) => situation.answers[p])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedId]
+  );
 
   function handleSelect(id: string) {
     setSelectedId(id);
@@ -40,15 +56,22 @@ export default function SituationsPage() {
     setSubmitted(false);
   }
 
-  const allFilled = POSITIONS.every((p) => answers[p]?.trim());
+  function handlePick(pos: keyof FieldPositions, value: string) {
+    setAnswers((prev) => ({ ...prev, [pos]: value }));
+  }
+
+  const allFilled = POSITIONS.every((p) => answers[p]);
+
+  // Which answers have already been assigned to another position
+  const usedAnswers = new Set(Object.values(answers).filter(Boolean));
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-xl font-bold tracking-wide">BASEBALL SITUATIONS</h1>
         <p className="text-white/50 text-sm mt-1">
-          Read the scenario, then describe where each player on the field should be or what they should do.
-          Submit to see the correct answers.
+          Read the scenario, then match each player to their correct assignment.
+          Submit to see how you did.
         </p>
       </div>
 
@@ -80,37 +103,45 @@ export default function SituationsPage() {
 
       <div className="flex flex-col gap-4">
         {POSITIONS.map((pos) => {
-          const userAnswer = answers[pos] ?? "";
+          const selected = answers[pos] ?? "";
           const correctAnswer = situation.answers[pos];
-          const isCorrect =
-            submitted &&
-            userAnswer.trim().toLowerCase().split(/\s+/).some((word) =>
-              correctAnswer.toLowerCase().includes(word) && word.length > 3
-            );
+          const isCorrect = submitted && selected === correctAnswer;
+          const isWrong = submitted && selected && selected !== correctAnswer;
 
           return (
             <div key={pos} className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold tracking-wide text-white/50 uppercase">
                 {pos} — {POSITION_LABELS[pos]}
               </label>
-              <input
-                value={userAnswer}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [pos]: e.target.value }))
-                }
+              <select
+                value={selected}
+                onChange={(e) => handlePick(pos, e.target.value)}
                 disabled={submitted}
-                placeholder={`What should the ${POSITION_LABELS[pos]} do?`}
-                className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm disabled:opacity-60"
-              />
-              {submitted && (
-                <div
-                  className={`text-xs rounded px-3 py-2 ${
-                    isCorrect
-                      ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                      : "bg-white/5 text-white/60 border border-white/10"
-                  }`}
-                >
-                  <span className="font-semibold">{isCorrect ? "✓ " : ""}Correct answer: </span>
+                className={`bg-white/5 border rounded px-3 py-2 text-sm disabled:opacity-70 transition-colors ${
+                  isCorrect
+                    ? "border-green-500/60 bg-green-500/10 text-green-400"
+                    : isWrong
+                    ? "border-red-500/40 bg-red-500/5 text-red-400"
+                    : "border-white/10"
+                }`}
+              >
+                <option value="" disabled>
+                  Select assignment for {POSITION_LABELS[pos]}…
+                </option>
+                {shuffledOptions.map((opt) => {
+                  // Allow the option if it's the current selection for this pos,
+                  // or if it hasn't been picked by another position yet
+                  const takenByOther = usedAnswers.has(opt) && opt !== selected;
+                  return (
+                    <option key={opt} value={opt} disabled={takenByOther}>
+                      {opt}
+                    </option>
+                  );
+                })}
+              </select>
+              {submitted && isWrong && (
+                <div className="text-xs rounded px-3 py-2 bg-white/5 text-white/60 border border-white/10">
+                  <span className="font-semibold">Correct: </span>
                   {correctAnswer}
                 </div>
               )}
