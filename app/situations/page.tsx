@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SITUATIONS } from "@/lib/situations";
 import type { FieldPositions } from "@/lib/situations";
+import DiamondView from "@/components/DiamondView";
 
 const POSITIONS: (keyof FieldPositions)[] = ["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
 const POSITION_LABELS: Record<keyof FieldPositions, string> = {
@@ -71,6 +72,10 @@ export default function SituationsPage() {
         <span className="text-accent text-xs font-bold tracking-wide">⚾ SITUATION</span>
         <h2 className="text-base font-bold">{situation.title}</h2>
         <p className="text-white/70 text-sm leading-relaxed">{situation.description}</p>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/3 p-4">
+        <DiamondView visual={situation.visual} />
       </div>
 
       <div className="flex flex-col gap-4">
