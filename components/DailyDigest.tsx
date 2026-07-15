@@ -100,9 +100,9 @@ export default function DailyDigest({
                     const label = def?.label || m.Metric;
                     const isBoolean = def?.type === "boolean";
                     return (
-                      <li key={m.Id} className="flex justify-between">
-                        <span>{label}</span>
-                        {!isBoolean && <span className="font-mono text-white">{m.Value}</span>}
+                      <li key={m.Id} className="flex justify-between gap-2">
+                        <span className="shrink-0">{label}</span>
+                        {!isBoolean && <span className="font-mono text-white text-right break-all">{m.Value}</span>}
                         {isBoolean && <span className="text-green-400">✓</span>}
                       </li>
                     );

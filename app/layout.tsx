@@ -41,7 +41,7 @@ export default function RootLayout({
           </Link>
           <NavMenu />
         </header>
-        <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto">{children}</main>
+        <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto overflow-x-hidden">{children}</main>
         <footer className="print:hidden border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
           <a
             href="https://exposuretristarbb.com/"
