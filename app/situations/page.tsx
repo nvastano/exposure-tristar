@@ -62,9 +62,6 @@ export default function SituationsPage() {
 
   const allFilled = POSITIONS.every((p) => answers[p]);
 
-  // Which answers have already been assigned to another position
-  const usedAnswers = new Set(Object.values(answers).filter(Boolean));
-
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -128,16 +125,11 @@ export default function SituationsPage() {
                 <option value="">
                   Select assignment for {POSITION_LABELS[pos]}…
                 </option>
-                {shuffledOptions.map((opt) => {
-                  // Allow the option if it's the current selection for this pos,
-                  // or if it hasn't been picked by another position yet
-                  const takenByOther = usedAnswers.has(opt) && opt !== selected;
-                  return (
-                    <option key={opt} value={opt} disabled={takenByOther}>
-                      {opt}
-                    </option>
-                  );
-                })}
+                {shuffledOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
               </select>
               {submitted && isWrong && (
                 <div className="text-xs rounded px-3 py-2 bg-white/5 text-white/60 border border-white/10">
