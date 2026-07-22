@@ -498,6 +498,7 @@ function doPost(e) {
       Order: nextOrder_(sameCategoryOrders),
       CreatedAt: new Date().toISOString(),
     });
+    notifyGroupMe_("📋 New drill added: " + body.name + (body.description ? "\n" + body.description : ""));
     result = { ok: true };
   } else if (body.action === "updateDrill") {
     var dSheet = drillsSheet_();
