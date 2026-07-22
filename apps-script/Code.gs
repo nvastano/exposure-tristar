@@ -498,7 +498,7 @@ function doPost(e) {
       Order: nextOrder_(sameCategoryOrders),
       CreatedAt: new Date().toISOString(),
     });
-    notifyGroupMe_("📋 New drill added: " + body.name + (body.description ? "\n" + body.description : ""));
+    notifyGroupMe_("📋 New drill added: " + body.name + (body.description ? "\n" + body.description : "") + "\nhttps://nvastano.github.io/exposure-tristar");
     result = { ok: true };
   } else if (body.action === "updateDrill") {
     var dSheet = drillsSheet_();
