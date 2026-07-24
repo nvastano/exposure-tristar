@@ -18,6 +18,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TriStar Baseball | Speed & Throwing Tracker",
   description: "TriStar Baseball player progress tracker for sprint times and throwing velocity.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TriStar",
+  },
+  icons: {
+    apple: "/exposure-tristar/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
