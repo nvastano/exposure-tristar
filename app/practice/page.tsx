@@ -126,14 +126,14 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-wide">PRACTICE STATS</h1>
           <p className="text-white/50 text-sm mt-1">
             Home-to-first sprint times and 3rd-to-1st throw velocity, tracked week over week.
           </p>
         </div>
-        <div className="flex items-end gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedDate && (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-white/50">Practice date</span>
