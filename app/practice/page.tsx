@@ -227,7 +227,7 @@ export default function Home() {
       )}
 
       <Modal open={showRoundEntry} onClose={() => setShowRoundEntry(false)}>
-        <PracticeRoundEntry date={selectedDate ?? localDateStr()} onSaved={refresh} />
+        <PracticeRoundEntry onSaved={refresh} />
       </Modal>
 
       <Modal open={showCoachEntry} onClose={() => setShowCoachEntry(false)}>

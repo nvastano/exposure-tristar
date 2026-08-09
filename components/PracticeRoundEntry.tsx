@@ -6,14 +6,9 @@ import { localDateStr } from "@/lib/stats";
 
 type PlayerRow = { Name: string };
 
-export default function PracticeRoundEntry({
-  date,
-  onSaved,
-}: {
-  date: string;
-  onSaved?: () => void;
-}) {
+export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
+  const [date, setDate] = useState(localDateStr());
   const [sprintValues, setSprintValues] = useState<Record<string, string>>({});
   const [throwValues, setThrowValues] = useState<Record<string, string>>({});
   const [roundsSaved, setRoundsSaved] = useState(0);
@@ -80,7 +75,15 @@ export default function PracticeRoundEntry({
         <p className="text-white/50 text-sm mt-1">
           Fill in the whole team at once. Leave blanks for players who didn&apos;t go. Save after each round.
         </p>
-        <p className="text-white/30 text-xs mt-1">Date: {date}</p>
+        <label className="flex items-center gap-2 text-xs text-white/40 mt-1">
+          Date
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/80"
+          />
+        </label>
       </div>
 
       {roundsSaved > 0 && (
