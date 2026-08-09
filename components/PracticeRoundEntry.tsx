@@ -6,15 +6,16 @@ import { localDateStr } from "@/lib/stats";
 
 type PlayerRow = { Name: string };
 
-const ROUND_METRICS = [
-  { key: "sprintTime", label: "Sprint Time", unit: "sec", inputMode: "decimal" as const },
-  { key: "throwVelocity", label: "Throw Velocity", unit: "mph", inputMode: "decimal" as const },
-];
-
-export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }) {
+export default function PracticeRoundEntry({
+  date,
+  onSaved,
+}: {
+  date: string;
+  onSaved?: () => void;
+}) {
   const [players, setPlayers] = useState<string[]>([]);
-  const [date, setDate] = useState(localDateStr());
-  const [values, setValues] = useState<Record<string, Record<string, string>>>({});
+  const [sprintValues, setSprintValues] = useState<Record<string, string>>({});
+  const [throwValues, setThrowValues] = useState<Record<string, string>>({});
   const [roundsSaved, setRoundsSaved] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -28,20 +29,16 @@ export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }
       .catch(() => {});
   }, []);
 
-  function setValue(player: string, metric: string, val: string) {
-    setValues((prev) => ({
-      ...prev,
-      [player]: { ...(prev[player] ?? {}), [metric]: val },
-    }));
-  }
-
   async function handleSaveRound() {
-    const entries: { date: string; player: string; metric: string; value: string }[] = [];
+    const entries: { player: string; sprint: number | null; throw: number | null }[] = [];
 
     for (const player of players) {
-      for (const m of ROUND_METRICS) {
-        const v = values[player]?.[m.key]?.trim();
-        if (v) entries.push({ date, player, metric: m.key, value: v });
+      const s = parseFloat(sprintValues[player] ?? "");
+      const t = parseFloat(throwValues[player] ?? "");
+      const hasSprint = Number.isFinite(s) && s > 0;
+      const hasThrow = Number.isFinite(t) && t > 0;
+      if (hasSprint || hasThrow) {
+        entries.push({ player, sprint: hasSprint ? s : null, throw: hasThrow ? t : null });
       }
     }
 
@@ -53,11 +50,22 @@ export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }
     setSubmitting(true);
     setStatus(null);
     try {
-      await sheetsPost("bulkMetrics", { entries });
+      await Promise.all(
+        entries.map((e) =>
+          sheetsPost("addEntry", {
+            date,
+            player: e.player,
+            sprintTimes: e.sprint !== null ? [e.sprint] : [],
+            throwVelos: e.throw !== null ? [e.throw] : [],
+          })
+        )
+      );
       const round = roundsSaved + 1;
       setRoundsSaved(round);
-      setValues({});
-      setStatus(`Round ${round} saved — ${entries.length} entries recorded.`);
+      setSprintValues({});
+      setThrowValues({});
+      setStatus(`Round ${round} saved — ${entries.length} player${entries.length > 1 ? "s" : ""} recorded.`);
+      onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
     } finally {
@@ -70,19 +78,10 @@ export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }
       <div>
         <h2 className="text-xl font-bold tracking-wide">PRACTICE ROUND ENTRY</h2>
         <p className="text-white/50 text-sm mt-1">
-          Enter stats for the whole team at once. Save after each round — leave blanks for players who didn&apos;t go.
+          Fill in the whole team at once. Leave blanks for players who didn&apos;t go. Save after each round.
         </p>
+        <p className="text-white/30 text-xs mt-1">Date: {date}</p>
       </div>
-
-      <label className="flex flex-col gap-1 text-sm w-48">
-        Date
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded px-3 py-2"
-        />
-      </label>
 
       {roundsSaved > 0 && (
         <div className="text-xs rounded px-3 py-2 bg-green-500/10 border border-green-500/20 text-green-400">
@@ -91,37 +90,50 @@ export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }
       )}
 
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-sm border-collapse min-w-[400px]">
+        <table className="w-full text-sm border-collapse min-w-[380px]">
           <thead>
             <tr className="border-b border-white/10">
-              <th className="text-left py-2 pr-4 font-semibold text-white/50 text-xs uppercase tracking-wide w-40">
+              <th className="text-left py-2 pr-4 font-semibold text-white/50 text-xs uppercase tracking-wide">
                 Player
               </th>
-              {ROUND_METRICS.map((m) => (
-                <th key={m.key} className="text-left py-2 px-2 font-semibold text-xs uppercase tracking-wide text-accent">
-                  {m.label}
-                  <span className="text-white/30 font-normal ml-1">({m.unit})</span>
-                </th>
-              ))}
+              <th className="text-left py-2 px-2 font-semibold text-xs uppercase tracking-wide text-accent">
+                Sprint Time <span className="text-white/30 font-normal">(s)</span>
+              </th>
+              <th className="text-left py-2 px-2 font-semibold text-xs uppercase tracking-wide text-accent">
+                Throw Velo <span className="text-white/30 font-normal">(mph)</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {players.map((player) => (
               <tr key={player} className="border-b border-white/5">
                 <td className="py-2 pr-4 text-white/80 text-sm">{player}</td>
-                {ROUND_METRICS.map((m) => (
-                  <td key={m.key} className="py-1.5 px-2">
-                    <input
-                      type="number"
-                      inputMode={m.inputMode}
-                      step="0.01"
-                      value={values[player]?.[m.key] ?? ""}
-                      onChange={(e) => setValue(player, m.key, e.target.value)}
-                      placeholder="—"
-                      className="bg-white/5 border border-white/10 rounded px-2 py-1.5 w-24 text-sm placeholder:text-white/20 focus:outline-none focus:border-accent/50"
-                    />
-                  </td>
-                ))}
+                <td className="py-1.5 px-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={sprintValues[player] ?? ""}
+                    onChange={(e) =>
+                      setSprintValues((prev) => ({ ...prev, [player]: e.target.value }))
+                    }
+                    placeholder="—"
+                    className="bg-white/5 border border-white/10 rounded px-2 py-1.5 w-20 text-sm placeholder:text-white/20 focus:outline-none focus:border-accent/50"
+                  />
+                </td>
+                <td className="py-1.5 px-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="1"
+                    value={throwValues[player] ?? ""}
+                    onChange={(e) =>
+                      setThrowValues((prev) => ({ ...prev, [player]: e.target.value }))
+                    }
+                    placeholder="—"
+                    className="bg-white/5 border border-white/10 rounded px-2 py-1.5 w-20 text-sm placeholder:text-white/20 focus:outline-none focus:border-accent/50"
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -134,7 +146,11 @@ export default function PracticeRoundEntry({ onSaved }: { onSaved?: () => void }
           disabled={submitting}
           className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-5 py-2 rounded disabled:opacity-50"
         >
-          {submitting ? "Saving..." : roundsSaved === 0 ? "Save Round 1" : `Save Round ${roundsSaved + 1}`}
+          {submitting
+            ? "Saving..."
+            : roundsSaved === 0
+            ? "Save Round 1"
+            : `Save Round ${roundsSaved + 1}`}
         </button>
         {roundsSaved > 0 && (
           <button

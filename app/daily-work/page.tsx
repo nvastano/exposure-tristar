@@ -7,7 +7,6 @@ import DailyDigest from "@/components/DailyDigest";
 import PlayerEntryForm from "@/components/PlayerEntryForm";
 import Modal from "@/components/Modal";
 import LogoLoader from "@/components/LogoLoader";
-import PracticeRoundEntry from "@/components/PracticeRoundEntry";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
@@ -19,7 +18,6 @@ export default function DailyPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEntry, setShowEntry] = useState(false);
-  const [showRound, setShowRound] = useState(false);
 
   async function refresh() {
     try {
@@ -57,13 +55,7 @@ export default function DailyPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex justify-end gap-2 flex-wrap">
-        <button
-          onClick={() => setShowRound(true)}
-          className="shrink-0 bg-white/10 hover:bg-white/20 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
-        >
-          Practice Round
-        </button>
+      <div className="flex justify-end">
         <button
           onClick={() => setShowEntry(true)}
           className="shrink-0 bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
@@ -73,15 +65,6 @@ export default function DailyPage() {
       </div>
 
       <DailyDigest players={players} metrics={metrics} triviaResponses={triviaResponses} />
-
-      <Modal open={showRound} onClose={() => setShowRound(false)}>
-        <PracticeRoundEntry
-          onSaved={() => {
-            refresh();
-            setShowRound(false);
-          }}
-        />
-      </Modal>
 
       <Modal open={showEntry} onClose={() => setShowEntry(false)}>
         <PlayerEntryForm

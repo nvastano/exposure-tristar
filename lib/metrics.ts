@@ -1,6 +1,6 @@
 export type MetricType = "number" | "boolean";
 
-export type MetricCategory = "Speed" | "Strength" | "Hitting" | "Throwing/Defense";
+export type MetricCategory = "Strength" | "Hitting" | "Throwing/Defense";
 
 export type MetricDef = {
   key: string;
@@ -12,11 +12,9 @@ export type MetricDef = {
 
 // Add new trackable stats here as they come up — no backend changes needed,
 // the Metrics sheet stores {player, date, metric: key, value} generically.
-export const METRIC_CATEGORIES: MetricCategory[] = ["Speed", "Strength", "Hitting", "Throwing/Defense"];
+export const METRIC_CATEGORIES: MetricCategory[] = ["Strength", "Hitting", "Throwing/Defense"];
 
 export const METRIC_DEFS: MetricDef[] = [
-  { key: "sprintTime", label: "Sprint Time", unit: "sec", type: "number", category: "Speed" },
-  { key: "throwVelocity", label: "Throw Velocity", unit: "mph", type: "number", category: "Speed" },
   { key: "pushups", label: "Push-ups", type: "number", category: "Strength" },
   { key: "situps", label: "Sit-Ups", type: "number", category: "Strength" },
   { key: "squats", label: "Squats", type: "number", category: "Strength" },

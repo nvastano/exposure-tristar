@@ -11,12 +11,14 @@ import {
   sprintDeltaOnDate,
   throwDeltaOnDate,
   formatDate,
+  localDateStr,
 } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import LogoLoader from "@/components/LogoLoader";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import PracticeLeaderboard from "@/components/PracticeLeaderboard";
 import CoachEntryForm from "@/components/CoachEntryForm";
+import PracticeRoundEntry from "@/components/PracticeRoundEntry";
 import Modal from "@/components/Modal";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 
@@ -43,6 +45,7 @@ export default function Home() {
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
   const [showCoachEntry, setShowCoachEntry] = useState(false);
+  const [showRoundEntry, setShowRoundEntry] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { unlocked, setUnlocked } = useCoachUnlocked();
 
@@ -150,10 +153,18 @@ export default function Home() {
           <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
           {unlocked && (
             <button
-              onClick={() => setShowCoachEntry(true)}
+              onClick={() => setShowRoundEntry(true)}
               className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
             >
-              + Coach Entry
+              Practice Round
+            </button>
+          )}
+          {unlocked && (
+            <button
+              onClick={() => setShowCoachEntry(true)}
+              className="bg-white/10 hover:bg-white/20 transition-colors text-white font-semibold text-sm px-4 py-2 rounded"
+            >
+              + Single Entry
             </button>
           )}
           {unlocked && !addingPlayer && (
@@ -214,6 +225,10 @@ export default function Home() {
           </button>
         </div>
       )}
+
+      <Modal open={showRoundEntry} onClose={() => setShowRoundEntry(false)}>
+        <PracticeRoundEntry date={selectedDate ?? localDateStr()} onSaved={refresh} />
+      </Modal>
 
       <Modal open={showCoachEntry} onClose={() => setShowCoachEntry(false)}>
         <CoachEntryForm onSaved={refresh} />
