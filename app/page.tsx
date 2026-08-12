@@ -16,7 +16,9 @@ import { toEmbedUrl, UNCATEGORIZED } from "@/lib/drills";
 import { formatDate } from "@/lib/stats";
 import type { RawDrillRow, RawDrillCategoryRow } from "@/lib/drills";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
+import DrillTracker from "@/components/DrillTracker";
 import LogoLoader from "@/components/LogoLoader";
+import type { RawMetricRow } from "@/lib/metrics";
 
 type Columns = Record<string, RawDrillRow[]>;
 
@@ -28,6 +30,8 @@ export default function DrillsPage() {
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
+  const [showTracker, setShowTracker] = useState(false);
   const { unlocked, setUnlocked } = useCoachUnlocked();
 
   const sensors = useSensors(
@@ -37,10 +41,12 @@ export default function DrillsPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const [drillData, categoryData] = await Promise.all([
+      const [drillData, categoryData, metricsData] = await Promise.all([
         sheetsGet("drills") as Promise<RawDrillRow[]>,
         sheetsGet("drillCategories") as Promise<RawDrillCategoryRow[]>,
+        sheetsGet("metrics").then((d) => (Array.isArray(d) ? d : [])).catch(() => []) as Promise<RawMetricRow[]>,
       ]);
+      setMetrics(metricsData);
       const sortedCategories = [...categoryData].sort(
         (a, b) => Number(a.Order ?? 0) - Number(b.Order ?? 0)
       );
@@ -235,6 +241,26 @@ export default function DrillsPage() {
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {unlocked && (
+        <div className="rounded-lg border border-white/10 bg-white/2">
+          <button
+            onClick={() => setShowTracker((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/70 hover:text-white transition-colors"
+          >
+            <span>Drill Completion Tracker</span>
+            <span className="text-white/30">{showTracker ? "▲" : "▼"}</span>
+          </button>
+          {showTracker && (
+            <div className="px-4 pb-4">
+              <DrillTracker
+                drills={Object.values(columns).flat()}
+                metrics={metrics}
+              />
+            </div>
+          )}
         </div>
       )}
 
