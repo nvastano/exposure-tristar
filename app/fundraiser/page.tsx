@@ -16,6 +16,8 @@ const FUNDRAISER = {
   playerGoal: 30,
   teamGoal: 300,
   endDate: new Date("2026-08-31T23:59:59"),
+  pricePerUnit: 25,
+  costPerUnit: 10,
 };
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -72,6 +74,8 @@ export default function FundraiserPage() {
   const teamGoal = players.length > 0 ? players.length * FUNDRAISER.playerGoal : FUNDRAISER.teamGoal;
   const progressPct = Math.min((teamTotal / teamGoal) * 100, 100);
   const playersAtGoal = ranked.filter((p) => p.units >= FUNDRAISER.playerGoal).length;
+  const revenue = teamTotal * FUNDRAISER.pricePerUnit;
+  const netProfit = teamTotal * (FUNDRAISER.pricePerUnit - FUNDRAISER.costPerUnit);
 
   async function handleSubmit() {
     if (!entryPlayer) { setStatus("Pick your name."); return; }
@@ -161,6 +165,20 @@ export default function FundraiserPage() {
           )}
         </div>
         <p className="text-xs text-white/30 text-right">{Math.round(progressPct)}% of goal</p>
+      </div>
+
+      {/* Revenue & Profit */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-white/10 bg-white/3 p-4 flex flex-col gap-1">
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Revenue</p>
+          <p className="text-2xl font-bold font-mono tabular-nums">${revenue.toLocaleString()}</p>
+          <p className="text-xs text-white/30">${FUNDRAISER.pricePerUnit}/mum × {teamTotal}</p>
+        </div>
+        <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 flex flex-col gap-1">
+          <p className="text-xs font-bold tracking-widest text-green-400/70 uppercase">Net Profit</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-green-400">${netProfit.toLocaleString()}</p>
+          <p className="text-xs text-white/30">${FUNDRAISER.pricePerUnit - FUNDRAISER.costPerUnit} profit/mum</p>
+        </div>
       </div>
 
       {/* Leaderboard */}
