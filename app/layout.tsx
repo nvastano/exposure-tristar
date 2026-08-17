@@ -16,12 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TriStar Baseball | Speed & Throwing Tracker",
-  description: "TriStar Baseball player progress tracker for sprint times and throwing velocity.",
+  title: "Team Elite Baseball | Player Development Tracker",
+  description: "Team Elite Baseball player development tracker for sprint times and throwing velocity.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "TriStar",
+    title: "Team Elite",
   },
   icons: {
     apple: "/exposure-tristar/apple-touch-icon.png",
@@ -43,7 +43,7 @@ export default function RootLayout({
           <Link href="/" className="flex items-center gap-3 min-w-0">
             <Logo size={48} />
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-lg font-bold tracking-wide truncate">EXPOSURE TRISTAR BASEBALL</span>
+              <span className="text-lg font-bold tracking-wide truncate">TEAM ELITE BASEBALL</span>
               <span className="text-xs text-white/50">Player Development Tracker</span>
             </div>
           </Link>
@@ -51,14 +51,7 @@ export default function RootLayout({
         </header>
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto overflow-x-hidden">{children}</main>
         <footer className="print:hidden border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
-          <a
-            href="https://exposuretristarbb.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-accent transition-colors"
-          >
-            exposuretristarbb.com
-          </a>
+          Team Elite Baseball
         </footer>
       </body>
     </html>
