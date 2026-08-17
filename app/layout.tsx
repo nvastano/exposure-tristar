@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Team Elite Baseball | Player Development Tracker",
-  description: "Team Elite Baseball player development tracker for sprint times and throwing velocity.",
+  description: "Team Elite Baseball — daily work, drills, practice stats, and fundraiser tracker for players.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
