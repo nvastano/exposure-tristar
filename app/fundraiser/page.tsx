@@ -54,12 +54,10 @@ export default function FundraiserPage() {
 
   useEffect(() => { refresh(); }, []);
 
-  // Latest submission per player = their current total
   const totals = useMemo(() => {
     const map = new Map<string, number>();
-    const sorted = [...sales].sort((a, b) => a.CreatedAt.localeCompare(b.CreatedAt));
-    for (const s of sorted) {
-      map.set(s.Player, parseInt(s.Units, 10) || 0);
+    for (const s of sales) {
+      map.set(s.Player, (map.get(s.Player) ?? 0) + (parseInt(s.Units, 10) || 0));
     }
     return map;
   }, [sales]);
@@ -222,7 +220,7 @@ export default function FundraiserPage() {
           <div>
             <h2 className="text-xl font-bold tracking-wide">{FUNDRAISER.emoji} LOG MY SALES</h2>
             <p className="text-white/50 text-sm mt-1">
-              Enter your <strong>total</strong> {FUNDRAISER.unit} sold so far — this replaces your previous count.
+              Enter how many additional {FUNDRAISER.unit} you sold — this will be added to your current total.
             </p>
           </div>
 
@@ -241,7 +239,7 @@ export default function FundraiserPage() {
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            Total {FUNDRAISER.unit} sold
+            {FUNDRAISER.unit} sold since last update
             <input
               type="number"
               inputMode="numeric"
