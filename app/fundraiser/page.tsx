@@ -169,7 +169,7 @@ export default function FundraiserPage() {
         {ranked.length === 0 ? (
           <p className="text-white/30 text-sm">No sales logged yet — be the first!</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {ranked.map((p, i) => {
               const goalPct = Math.min((p.units / FUNDRAISER.playerGoal) * 100, 100);
               const hitGoal = p.units >= FUNDRAISER.playerGoal;
