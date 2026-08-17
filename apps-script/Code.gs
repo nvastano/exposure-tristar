@@ -17,6 +17,7 @@ var PRACTICE_PLANS_SHEET = "PracticePlans";
 var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
 var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
 var TRIVIA_RESPONSES_SHEET = "TriviaResponses";
+var FUNDRAISER_SALES_SHEET = "FundraiserSales";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -340,6 +341,8 @@ function doGet(e) {
       });
     }
     result = allPlanItems;
+  } else if (action === "fundraiserSales") {
+    result = rowsToObjects_(getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]).getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -775,6 +778,18 @@ function doPost(e) {
       ensurePlanDrill_(n);
     });
     result = { ok: true, count: (body.names || []).length };
+  } else if (body.action === "logFundraiserSale") {
+    var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
+    backfillIds_(fsSheet);
+    appendRowByHeaders_(fsSheet, {
+      Id: newId_(),
+      FundraiserId: body.fundraiserId,
+      Player: body.player,
+      Units: body.units,
+      Date: new Date().toISOString().slice(0, 10),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
   } else {
     result = { error: "unknown action" };
   }
