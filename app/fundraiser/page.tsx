@@ -13,6 +13,7 @@ const FUNDRAISER = {
   emoji: "🌻",
   unit: "mums",
   unitLabel: "Mums Sold",
+  playerGoal: 30,
   teamGoal: 300,
   endDate: new Date("2026-08-31T23:59:59"),
 };
@@ -70,7 +71,9 @@ export default function FundraiserPage() {
   }, [players, totals]);
 
   const teamTotal = useMemo(() => ranked.reduce((s, p) => s + p.units, 0), [ranked]);
-  const progressPct = Math.min((teamTotal / FUNDRAISER.teamGoal) * 100, 100);
+  const teamGoal = players.length > 0 ? players.length * FUNDRAISER.playerGoal : FUNDRAISER.teamGoal;
+  const progressPct = Math.min((teamTotal / teamGoal) * 100, 100);
+  const playersAtGoal = ranked.filter((p) => p.units >= FUNDRAISER.playerGoal).length;
 
   async function handleSubmit() {
     if (!entryPlayer) { setStatus("Pick your name."); return; }
@@ -143,8 +146,9 @@ export default function FundraiserPage() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-white/40">Goal</p>
-            <p className="text-lg font-bold font-mono text-white/60">{FUNDRAISER.teamGoal}</p>
+            <p className="text-xs text-white/40">Team Goal</p>
+            <p className="text-lg font-bold font-mono text-white/60">{teamGoal}</p>
+            <p className="text-xs text-white/30">{playersAtGoal}/{players.length} at goal</p>
           </div>
         </div>
         <div className="relative h-4 rounded-full bg-white/10 overflow-hidden">
@@ -153,8 +157,8 @@ export default function FundraiserPage() {
             style={{ width: `${progressPct}%` }}
           />
           {progressPct >= 100 && (
-            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
-              GOAL REACHED! 🎉
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white bg-green-600/80">
+              TEAM GOAL REACHED! 🎉
             </div>
           )}
         </div>
@@ -169,38 +173,42 @@ export default function FundraiserPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {ranked.map((p, i) => {
-              const barPct = ranked[0].units > 0 ? (p.units / ranked[0].units) * 100 : 0;
+              const goalPct = Math.min((p.units / FUNDRAISER.playerGoal) * 100, 100);
+              const hitGoal = p.units >= FUNDRAISER.playerGoal;
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-lg border overflow-hidden ${
-                    i === 0 && p.units > 0
+                  className={`rounded-lg border p-4 flex flex-col gap-2 ${
+                    hitGoal
+                      ? "border-green-500/40 bg-green-500/5"
+                      : i === 0 && p.units > 0
                       ? "border-yellow-500/40 bg-yellow-500/5"
                       : "border-white/10 bg-white/3"
                   }`}
                 >
-                  <div
-                    className={`absolute inset-y-0 left-0 transition-all duration-700 ${
-                      i === 0 && p.units > 0 ? "bg-yellow-500/10" : "bg-white/5"
-                    }`}
-                    style={{ width: `${barPct}%` }}
-                  />
-                  <div className="relative flex items-center gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3">
                     <span className="text-lg w-8 text-center shrink-0">
-                      {p.units > 0 ? rankBadge(i + 1) : <span className="text-white/20 text-sm">—</span>}
+                      {hitGoal ? "✅" : p.units > 0 ? rankBadge(i + 1) : <span className="text-white/20 text-sm">—</span>}
                     </span>
                     <span className="font-semibold flex-1">{p.name}</span>
                     <span className="font-mono font-bold tabular-nums text-right">
-                      {p.units > 0 ? (
-                        <>
-                          {p.units}
-                          <span className="text-white/40 font-normal text-xs ml-1">{FUNDRAISER.unit}</span>
-                        </>
-                      ) : (
-                        <span className="text-white/20 text-sm">0</span>
-                      )}
+                      <span className={hitGoal ? "text-green-400" : ""}>{p.units}</span>
+                      <span className="text-white/30 font-normal text-xs">/{FUNDRAISER.playerGoal}</span>
                     </span>
                   </div>
+                  <div className="relative h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${
+                        hitGoal ? "bg-green-500" : "bg-accent"
+                      }`}
+                      style={{ width: `${goalPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-white/30 text-right">
+                    {hitGoal
+                      ? `Goal reached! +${p.units - FUNDRAISER.playerGoal} extra`
+                      : `${FUNDRAISER.playerGoal - p.units} to go`}
+                  </p>
                 </div>
               );
             })}
