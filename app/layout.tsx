@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import NavMenu from "@/components/NavMenu";
+import ScriptureBanner from "@/components/ScriptureBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,16 +40,18 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-black text-white">
-        <header className="print:hidden relative border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 min-w-0">
+        <header className="print:hidden relative border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-3 min-w-0 shrink-0">
             <Logo size={48} />
             <div className="flex flex-col leading-tight min-w-0">
               <span className="text-lg font-bold tracking-wide truncate">TEAM ELITE BASEBALL</span>
               <span className="text-xs text-white/50">Player Development Tracker</span>
             </div>
           </Link>
+          <ScriptureBanner />
           <NavMenu />
         </header>
+        <ScriptureBanner mobile />
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto overflow-x-hidden">{children}</main>
         <footer className="print:hidden border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
           Team Elite Baseball
