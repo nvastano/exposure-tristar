@@ -1,50 +1,49 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import type { RawMetricRow } from "@/lib/metrics";
-import { METRIC_CATEGORIES, METRIC_DEFS, metricDef } from "@/lib/metrics";
+import { METRIC_CATEGORIES, metricDef } from "@/lib/metrics";
 import { formatDate } from "@/lib/stats";
 
-const BAR_COLORS = ["#c8102e", "#ffffff", "#4f9dff"];
-
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function parseDate(date: string): Date {
-  const [y, m, d] = date.split("-").map(Number);
+function parseDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 
-function toDateStr(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function currentStreak(sortedDates: string[]): number {
+  if (!sortedDates.length) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let streak = 0;
+  let cursor = new Date(today);
+  const dateSet = new Set(sortedDates);
+  // allow today or yesterday as the most recent
+  const latest = parseDate(sortedDates[sortedDates.length - 1]);
+  const diffDays = Math.round((today.getTime() - latest.getTime()) / 86400000);
+  if (diffDays > 1) return 0;
+  if (diffDays === 1) cursor.setDate(cursor.getDate() - 1);
+  while (true) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    if (!dateSet.has(key)) break;
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
-function mondayOf(date: Date): Date {
-  const d = new Date(date);
-  const dayOfWeek = d.getDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function weekDates(monday: Date): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(d.getDate() + i);
-    return toDateStr(d);
-  });
+function daySummaryPills(entries: RawMetricRow[]): string[] {
+  const pills: string[] = [];
+  const hasStrength = entries.some((m) => metricDef(m.Metric)?.category === "Strength");
+  const hasHitting = entries.some((m) => metricDef(m.Metric)?.category === "Hitting");
+  const hasThrowing = entries.some((m) => metricDef(m.Metric)?.category === "Throwing/Defense");
+  const drillCount = entries.filter((m) => m.Metric === "Drill").length;
+  const hasOther = entries.some((m) => m.Metric === "Other");
+  if (hasStrength) pills.push("Strength");
+  if (hasHitting) pills.push("Hitting");
+  if (hasThrowing) pills.push("Throwing");
+  if (drillCount > 0) pills.push(`${drillCount} Drill${drillCount > 1 ? "s" : ""}`);
+  if (hasOther) pills.push("Other");
+  return pills;
 }
 
 export default function PlayerDailyWork({
@@ -56,41 +55,7 @@ export default function PlayerDailyWork({
   canEdit: boolean;
   onDelete: (id: string) => void;
 }) {
-  const numericDefs = METRIC_DEFS.filter((def) => def.type === "number");
-
-  const allDates = useMemo(
-    () => metrics.map((m) => formatDate(m.Date)).sort(),
-    [metrics]
-  );
-  const latestMonday = useMemo(() => {
-    const ref = allDates.length ? parseDate(allDates[allDates.length - 1]) : new Date();
-    return mondayOf(ref);
-  }, [allDates]);
-
-  const [weekOffset, setWeekOffset] = useState(0);
-
-  const weekStart = useMemo(() => {
-    const d = new Date(latestMonday);
-    d.setDate(d.getDate() + weekOffset * 7);
-    return d;
-  }, [latestMonday, weekOffset]);
-
-  const days = useMemo(() => weekDates(weekStart), [weekStart]);
-
-  const chartData = useMemo(() => {
-    return days.map((date, i) => {
-      const row: Record<string, string | number> = { day: DAY_LABELS[i] };
-      for (const def of numericDefs) {
-        const match = metrics.find((m) => formatDate(m.Date) === date && m.Metric === def.key);
-        row[def.label] = match ? Number(match.Value) : 0;
-      }
-      return row;
-    });
-  }, [days, metrics, numericDefs]);
-
-  const hasAnyNumericData = chartData.some((row) =>
-    numericDefs.some((def) => Number(row[def.label]) > 0)
-  );
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
   const byDate = useMemo(() => {
     const map = new Map<string, RawMetricRow[]>();
@@ -102,80 +67,82 @@ export default function PlayerDailyWork({
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [metrics]);
 
+  const sortedDates = useMemo(() => byDate.map(([d]) => d).reverse(), [byDate]);
+
+  const streak = useMemo(() => currentStreak(sortedDates), [sortedDates]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of metrics) {
+      const cat = m.Metric === "Drill" ? "Drills" : m.Metric === "Other" ? "Other" : metricDef(m.Metric)?.category ?? "Other";
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    }
+    return counts;
+  }, [metrics]);
+
+  const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
   if (metrics.length === 0) {
-    return <p className="text-white/50 text-sm">No daily work logged yet for this player.</p>;
+    return <p className="text-white/50 text-sm">No daily work logged yet.</p>;
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {numericDefs.length > 0 && (
-        <div className="rounded-lg border border-white/10 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white/70">
-              Week of {days[0]} – {days[6]}
-            </h3>
-            <div className="flex gap-2 text-sm">
-              <button
-                onClick={() => setWeekOffset((w) => w - 1)}
-                className="text-white/50 hover:text-accent px-2"
-                aria-label="Previous week"
-              >
-                ‹ Prev
-              </button>
-              <button
-                onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
-                disabled={weekOffset === 0}
-                className="text-white/50 hover:text-accent px-2 disabled:opacity-20"
-                aria-label="Next week"
-              >
-                Next ›
-              </button>
-            </div>
-          </div>
-          {hasAnyNumericData ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={chartData}>
-                <CartesianGrid stroke="#ffffff1a" />
-                <XAxis dataKey="day" stroke="#ffffff66" fontSize={12} />
-                <YAxis stroke="#ffffff66" fontSize={12} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: "#111", border: "1px solid #333" }}
-                  labelStyle={{ color: "#fff" }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                {numericDefs.map((def, i) => (
-                  <Bar
-                    key={def.key}
-                    dataKey={def.label}
-                    fill={BAR_COLORS[i % BAR_COLORS.length]}
-                    radius={[3, 3, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-white/30 text-sm py-10 text-center">No strength stats logged this week.</p>
-          )}
-        </div>
-      )}
+    <div className="flex flex-col gap-5">
 
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-white/70">Daily work log</h3>
-        {byDate.map(([date, entries]) => (
-          <DayLogCard key={date} date={date} entries={entries} canEdit={canEdit} onDelete={onDelete} />
-        ))}
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border border-white/10 bg-white/3 p-3 text-center">
+          <p className="text-2xl font-bold font-mono tabular-nums">{byDate.length}</p>
+          <p className="text-xs text-white/40 mt-0.5">Days logged</p>
+        </div>
+        <div className={`rounded-lg border p-3 text-center ${streak > 0 ? "border-accent/40 bg-accent/5" : "border-white/10 bg-white/3"}`}>
+          <p className={`text-2xl font-bold font-mono tabular-nums ${streak > 0 ? "text-accent" : ""}`}>{streak}</p>
+          <p className="text-xs text-white/40 mt-0.5">Day streak</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/3 p-3 text-center">
+          <p className="text-sm font-bold truncate">{topCategory ?? "—"}</p>
+          <p className="text-xs text-white/40 mt-0.5">Top focus</p>
+        </div>
+      </div>
+
+      {/* Activity log */}
+      <div className="flex flex-col gap-2">
+        <h3 className="text-xs font-bold tracking-widest text-white/40 uppercase">Activity Log</h3>
+        {byDate.map(([date, entries]) => {
+          const expanded = expandedDate === date;
+          const pills = daySummaryPills(entries);
+          return (
+            <div key={date} className="rounded-lg border border-white/10 overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
+                onClick={() => setExpandedDate(expanded ? null : date)}
+              >
+                <span className="text-sm font-semibold text-white/80">{date}</span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {pills.map((p) => (
+                    <span key={p} className="text-xs bg-white/10 text-white/60 rounded-full px-2 py-0.5">{p}</span>
+                  ))}
+                  <span className="text-white/30 text-xs ml-1">{expanded ? "▲" : "▼"}</span>
+                </div>
+              </button>
+              {expanded && (
+                <div className="border-t border-white/10 px-4 py-3 flex flex-col gap-2 text-sm">
+                  <DayDetail entries={entries} canEdit={canEdit} onDelete={onDelete} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function DayLogCard({
-  date,
+function DayDetail({
   entries,
   canEdit,
   onDelete,
 }: {
-  date: string;
   entries: RawMetricRow[];
   canEdit: boolean;
   onDelete: (id: string) => void;
@@ -189,9 +156,7 @@ function DayLogCard({
   const other = entries.filter((m) => m.Metric === "Other");
 
   return (
-    <div className="rounded-lg border border-white/10 p-4 flex flex-col gap-2 text-sm">
-      <span className="text-xs font-semibold tracking-wide text-accent">{date}</span>
-
+    <>
       {strength.length > 0 && (
         <Row label="Strength">
           {strength.map((m) => (
@@ -201,20 +166,17 @@ function DayLogCard({
           ))}
         </Row>
       )}
-
-      {byCategory.map(
-        ({ category, rows }) =>
-          rows.length > 0 && (
-            <Row key={category} label={category}>
-              {rows.map((m) => (
-                <Entry key={m.Id} canEdit={canEdit} onDelete={() => onDelete(m.Id)}>
-                  ✓ {metricDef(m.Metric)?.label}
-                </Entry>
-              ))}
-            </Row>
-          )
+      {byCategory.map(({ category, rows }) =>
+        rows.length > 0 ? (
+          <Row key={category} label={category}>
+            {rows.map((m) => (
+              <Entry key={m.Id} canEdit={canEdit} onDelete={() => onDelete(m.Id)}>
+                ✓ {metricDef(m.Metric)?.label}
+              </Entry>
+            ))}
+          </Row>
+        ) : null
       )}
-
       {drills.length > 0 && (
         <Row label="Drills">
           {drills.map((m) => (
@@ -224,7 +186,6 @@ function DayLogCard({
           ))}
         </Row>
       )}
-
       {other.length > 0 && (
         <Row label="Other">
           {other.map((m) => (
@@ -234,14 +195,14 @@ function DayLogCard({
           ))}
         </Row>
       )}
-    </div>
+    </>
   );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="text-white/40 w-28 shrink-0">{label}</span>
+      <span className="text-white/40 w-28 shrink-0 text-xs pt-0.5">{label}</span>
       <div className="flex flex-col gap-1">{children}</div>
     </div>
   );
@@ -257,15 +218,10 @@ function Entry({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 text-white/80">
+    <div className="flex items-center gap-2 text-white/80 text-sm">
       <span>{children}</span>
       {canEdit && (
-        <button
-          onClick={onDelete}
-          className="text-white/30 hover:text-accent"
-          aria-label="Delete entry"
-          title="Delete"
-        >
+        <button onClick={onDelete} className="text-white/30 hover:text-accent" aria-label="Delete">
           ✕
         </button>
       )}
