@@ -15,7 +15,7 @@ export default function PlayerPhoto({
   name: string;
   size?: number;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState<"jpg" | "jpeg" | "failed">("jpg");
 
   const initials = name
     .split(" ")
@@ -25,17 +25,17 @@ export default function PlayerPhoto({
     .join("")
     .toUpperCase();
 
-  if (!failed) {
+  if (attempt !== "failed") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`${BASE_PATH}/players/${slugifyName(name)}.jpg`}
+        src={`${BASE_PATH}/players/${slugifyName(name)}.${attempt}`}
         alt={name}
         width={size}
         height={size}
         style={{ width: size, height: size }}
         className="rounded-full object-cover border border-white/10 flex-shrink-0"
-        onError={() => setFailed(true)}
+        onError={() => setAttempt(attempt === "jpg" ? "jpeg" : "failed")}
       />
     );
   }
