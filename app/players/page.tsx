@@ -12,8 +12,55 @@ import PlayerCharts from "./PlayerCharts";
 import PlayerDailyWork from "@/components/PlayerDailyWork";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
+import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
+
+function PlayerRoster() {
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    sheetsGet("players")
+      .then((p) => setPlayers(p as PlayerRow[]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <LogoLoader />;
+
+  const sorted = [...players].sort((a, b) => {
+    const na = parseInt(a.Number || "999", 10);
+    const nb = parseInt(b.Number || "999", 10);
+    return na - nb;
+  });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Roster</p>
+        <h1 className="text-2xl font-bold tracking-wide">PLAYERS</h1>
+        <p className="text-white/50 text-sm mt-1">Select a player to view their stats and activity.</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {sorted.map((p) => (
+          <Link
+            key={p.Id}
+            href={`/players?name=${encodeURIComponent(p.Name)}`}
+            className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/3 p-4 hover:border-accent/50 hover:bg-white/5 transition-colors"
+          >
+            <PlayerPhoto name={p.Name} size={64} />
+            <div className="text-center">
+              {p.Number && (
+                <p className="text-accent text-xs font-bold font-mono">#{p.Number}</p>
+              )}
+              <p className="font-semibold text-sm leading-tight">{p.Name}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PlayerContent() {
   const searchParams = useSearchParams();
@@ -94,7 +141,7 @@ function PlayerContent() {
   }
 
   if (!playerName) {
-    return <p className="text-white/50 text-sm">No player selected.</p>;
+    return <PlayerRoster />;
   }
 
   if (loading) {
@@ -113,8 +160,13 @@ function PlayerContent() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-wide">{playerName}</h1>
+        <Link href="/players" className="text-white/40 hover:text-accent text-sm mb-3 inline-block">
+          ← All Players
+        </Link>
+        <div className="flex items-center gap-3 mb-1">
+          <PlayerPhoto name={playerName} size={56} />
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-wide">{playerName}</h1>
           {player?.Number && !editingNumber && (
             <span className="text-white/40 text-lg font-mono">#{player.Number}</span>
           )}
@@ -154,6 +206,7 @@ function PlayerContent() {
               {player?.Number ? "✎" : "+ #"}
             </button>
           )}
+        </div>
         </div>
         <p className="text-white/50 text-sm mt-1">Week-over-week progress</p>
         <div className="mt-2">
