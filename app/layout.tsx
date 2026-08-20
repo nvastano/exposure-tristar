@@ -25,6 +25,7 @@ export const metadata: Metadata = {
     title: "Team Elite",
   },
   icons: {
+    icon: "/exposure-tristar/favicon.png",
     apple: "/exposure-tristar/apple-touch-icon.png",
   },
 };
