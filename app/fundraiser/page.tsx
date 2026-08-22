@@ -15,6 +15,7 @@ const FUNDRAISER = {
   unitLabel: "Mums Sold",
   playerGoal: 30,
   teamGoal: 300,
+  stretchGoal: 430,
   endDate: new Date("2026-08-31T23:59:59"),
   pricePerUnit: 25,
   costPerUnit: 10,
@@ -138,34 +139,63 @@ export default function FundraiserPage() {
       )}
 
       {/* Team Progress */}
-      <div className="rounded-lg border border-white/10 bg-white/3 p-5 flex flex-col gap-3">
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Team Total</p>
-            <p className="text-3xl font-bold font-mono tabular-nums mt-0.5">
-              {teamTotal}
-              <span className="text-white/40 text-lg font-normal ml-1">{FUNDRAISER.unit}</span>
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-white/40">Team Goal</p>
-            <p className="text-lg font-bold font-mono text-white/60">{teamGoal}</p>
-            <p className="text-xs text-white/30">{playersAtGoal}/{players.length} at goal</p>
-          </div>
-        </div>
-        <div className="relative h-4 rounded-full bg-white/10 overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-accent transition-all duration-700"
-            style={{ width: `${progressPct}%` }}
-          />
-          {progressPct >= 100 && (
-            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white bg-green-600/80">
-              TEAM GOAL REACHED! 🎉
+      {(() => {
+        const stretchPct = Math.min((teamTotal / FUNDRAISER.stretchGoal) * 100, 100);
+        const goalMarkerPct = (teamGoal / FUNDRAISER.stretchGoal) * 100;
+        const hitGoal = teamTotal >= teamGoal;
+        const hitStretch = teamTotal >= FUNDRAISER.stretchGoal;
+        return (
+          <div className="rounded-lg border border-white/10 bg-white/3 p-5 flex flex-col gap-3">
+            <div className="flex items-end justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Team Total</p>
+                <p className="text-3xl font-bold font-mono tabular-nums mt-0.5">
+                  {teamTotal}
+                  <span className="text-white/40 text-lg font-normal ml-1">{FUNDRAISER.unit}</span>
+                </p>
+              </div>
+              <div className="text-right flex flex-col gap-1">
+                <div>
+                  <p className="text-xs text-white/40">Team Goal</p>
+                  <p className={`text-base font-bold font-mono ${hitGoal ? "text-green-400 line-through" : "text-white/60"}`}>{teamGoal}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-yellow-400/60">Stretch Goal 🌟</p>
+                  <p className={`text-base font-bold font-mono ${hitStretch ? "text-yellow-400" : "text-yellow-400/60"}`}>{FUNDRAISER.stretchGoal}</p>
+                </div>
+                <p className="text-xs text-white/30">{playersAtGoal}/{players.length} at individual goal</p>
+              </div>
             </div>
-          )}
-        </div>
-        <p className="text-xs text-white/30 text-right">{Math.round(progressPct)}% of goal</p>
-      </div>
+            {/* Progress bar scaled to stretch goal */}
+            <div className="relative h-4 rounded-full bg-white/10 overflow-visible">
+              {/* Fill */}
+              <div
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${hitStretch ? "bg-yellow-400" : hitGoal ? "bg-green-500" : "bg-accent"}`}
+                style={{ width: `${stretchPct}%`, borderRadius: "9999px" }}
+              />
+              {/* Goal marker line */}
+              {!hitStretch && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white/40"
+                  style={{ left: `${goalMarkerPct}%` }}
+                  title={`Team goal: ${teamGoal}`}
+                />
+              )}
+              {(hitGoal || hitStretch) && (
+                <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white rounded-full overflow-hidden"
+                  style={{ background: hitStretch ? "rgba(234,179,8,0.85)" : "rgba(22,163,74,0.85)" }}>
+                  {hitStretch ? "STRETCH GOAL REACHED! 🌟" : "TEAM GOAL REACHED! 🎉"}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between text-xs text-white/30">
+              <span>{Math.round(stretchPct)}% to stretch goal</span>
+              {!hitGoal && <span>{teamGoal - teamTotal} to team goal</span>}
+              {hitGoal && !hitStretch && <span className="text-yellow-400/70">{FUNDRAISER.stretchGoal - teamTotal} to stretch 🌟</span>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Revenue & Profit */}
       <div className="grid grid-cols-2 gap-3">
