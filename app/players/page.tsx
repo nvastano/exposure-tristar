@@ -128,6 +128,7 @@ function PlayerContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(playerName));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const { unlocked, setUnlocked } = useCoachUnlocked();
 
   async function load() {
@@ -264,10 +265,32 @@ function PlayerContent() {
         </div>
         </div>
         <p className="text-white/50 text-sm mt-1">Week-over-week progress</p>
-        <div className="mt-2">
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
           <CoachUnlock unlocked={unlocked} onUnlock={() => setUnlocked(true)} />
+          {unlocked && (
+            <button
+              onClick={() => setShowProfile((v) => !v)}
+              className="text-xs font-semibold px-3 py-1.5 rounded border border-white/20 hover:border-accent/60 hover:text-accent transition-colors text-white/60"
+            >
+              {showProfile ? "Hide Profile" : "Family Profile"}
+            </button>
+          )}
         </div>
       </div>
+
+      {unlocked && showProfile && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-wide">Player &amp; Family Profile</h2>
+          {profile ? (
+            <ProfileCard profile={profile} />
+          ) : (
+            <div className="rounded-lg border border-white/10 bg-white/3 p-4 text-sm text-white/40">
+              No profile submitted yet.{" "}
+              <Link href="/intake" className="text-accent hover:underline">Share the intake form</Link> with this family.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-bold tracking-wide">Practice Stats</h2>
@@ -334,19 +357,6 @@ function PlayerContent() {
         </div>
       )}
 
-      {unlocked && (
-        <div className="flex flex-col gap-4">
-          <h2 className="text-lg font-bold tracking-wide">Player &amp; Family Profile</h2>
-          {profile ? (
-            <ProfileCard profile={profile} />
-          ) : (
-            <div className="rounded-lg border border-white/10 bg-white/3 p-4 text-sm text-white/40">
-              No profile submitted yet.{" "}
-              <Link href="/intake" className="text-accent hover:underline">Share the intake form</Link> with this family.
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
