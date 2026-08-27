@@ -16,6 +16,9 @@ var PRACTICE_PLAN_DRILLS_SHEET = "PracticePlanDrills";
 var PRACTICE_PLANS_SHEET = "PracticePlans";
 var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
 var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
+var TRIVIA_RESPONSES_SHEET = "TriviaResponses";
+var FUNDRAISER_SALES_SHEET = "FundraiserSales";
+var PLAYER_PROFILES_SHEET = "PlayerProfiles";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -185,7 +188,8 @@ function practicePlanDrillsSheet_() {
 }
 
 function practicePlansSheet_() {
-  var sheet = getSheet_(PRACTICE_PLANS_SHEET, ["Id", "Date", "CreatedAt"]);
+  var sheet = getSheet_(PRACTICE_PLANS_SHEET, ["Id", "Date", "CreatedAt", "DurationMinutes"]);
+  ensureColumn_(sheet, "DurationMinutes");
   backfillIds_(sheet);
   return sheet;
 }
@@ -199,8 +203,10 @@ function practicePlanItemsSheet_() {
     "Order",
     "CreatedAt",
     "CategoryId",
+    "VideoUrl",
   ]);
   ensureColumn_(sheet, "CategoryId");
+  ensureColumn_(sheet, "VideoUrl");
   backfillIds_(sheet);
   return sheet;
 }
@@ -326,6 +332,8 @@ function doGet(e) {
     result = rowsToObjects_(practicePlansSheet_().getDataRange().getValues());
   } else if (action === "practicePlanCategories") {
     result = rowsToObjects_(practicePlanCategoriesSheet_().getDataRange().getValues());
+  } else if (action === "triviaResponses") {
+    result = rowsToObjects_(getSheet_(TRIVIA_RESPONSES_SHEET, ["Id", "Player", "QuestionId", "Answer", "Correct", "Date", "CreatedAt"]).getDataRange().getValues());
   } else if (action === "practicePlanItems") {
     var allPlanItems = rowsToObjects_(practicePlanItemsSheet_().getDataRange().getValues());
     if (e.parameter.planId) {
@@ -334,6 +342,10 @@ function doGet(e) {
       });
     }
     result = allPlanItems;
+  } else if (action === "fundraiserSales") {
+    result = rowsToObjects_(getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]).getDataRange().getValues());
+  } else if (action === "playerProfiles") {
+    result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"]).getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -492,7 +504,7 @@ function doPost(e) {
       Order: nextOrder_(sameCategoryOrders),
       CreatedAt: new Date().toISOString(),
     });
-    notifyGroupMe_("📋 New drill added: " + body.name + (body.description ? "\n" + body.description : ""));
+    notifyGroupMe_("📋 New drill added: " + body.name + (body.description ? "\n" + body.description : "") + "\nhttps://nvastano.github.io/exposure-tristar");
     result = { ok: true };
   } else if (body.action === "updateDrill") {
     var dSheet = drillsSheet_();
@@ -645,9 +657,21 @@ function doPost(e) {
     appendRowByHeaders_(practicePlansSheet_(), {
       Id: newPlanId,
       Date: body.date,
+      DurationMinutes: body.durationMinutes || 240,
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true, id: newPlanId };
+  } else if (body.action === "updatePracticePlan") {
+    var upSheet = practicePlansSheet_();
+    var upRow = findRowById_(upSheet, body.id);
+    if (upRow === -1) {
+      result = { error: "practice plan not found" };
+    } else {
+      var upUpdates = {};
+      if (body.durationMinutes !== undefined) upUpdates.DurationMinutes = body.durationMinutes;
+      setRowByHeaders_(upSheet, upRow, upUpdates);
+      result = { ok: true };
+    }
   } else if (body.action === "deletePracticePlan") {
     var ppSheet = practicePlansSheet_();
     var ppRow = findRowById_(ppSheet, body.id);
@@ -685,8 +709,20 @@ function doPost(e) {
       Order: nextOrder_(samePlanOrders),
       CreatedAt: new Date().toISOString(),
       CategoryId: body.categoryId || "",
+      VideoUrl: body.videoUrl || "",
     });
     result = { ok: true };
+  } else if (body.action === "updatePlanItem") {
+    var upiSheet = practicePlanItemsSheet_();
+    var upiRow = findRowById_(upiSheet, body.id);
+    if (upiRow === -1) {
+      result = { error: "plan item not found" };
+    } else {
+      var upiUpdates = {};
+      if (body.videoUrl !== undefined) upiUpdates.VideoUrl = body.videoUrl;
+      setRowByHeaders_(upiSheet, upiRow, upiUpdates);
+      result = { ok: true };
+    }
   } else if (body.action === "deletePlanItem") {
     var diSheet = practicePlanItemsSheet_();
     var diRow = findRowById_(diSheet, body.id);
@@ -727,11 +763,64 @@ function doPost(e) {
       }
       result = { ok: true };
     }
+  } else if (body.action === "recordTriviaResponse") {
+    var trSheet = getSheet_(TRIVIA_RESPONSES_SHEET, ["Id", "Player", "QuestionId", "Answer", "Correct", "Date", "CreatedAt"]);
+    backfillIds_(trSheet);
+    appendRowByHeaders_(trSheet, {
+      Id: newId_(),
+      Player: body.player,
+      QuestionId: body.questionId,
+      Answer: body.answer,
+      Correct: body.correct ? "yes" : "no",
+      Date: body.date || new Date().toISOString().slice(0, 10),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
   } else if (body.action === "seedPracticePlanDrills") {
     (body.names || []).forEach(function (n) {
       ensurePlanDrill_(n);
     });
     result = { ok: true, count: (body.names || []).length };
+  } else if (body.action === "logPlayerProfile") {
+    var ppHeaders = ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"];
+    var ppSheet = getSheet_(PLAYER_PROFILES_SHEET, ppHeaders);
+    backfillIds_(ppSheet);
+    appendRowByHeaders_(ppSheet, {
+      Id: newId_(),
+      Player: body.player,
+      DOB: body.dob || "",
+      HeightFt: body.heightFt || "",
+      HeightIn: body.heightIn || "",
+      Weight: body.weight || "",
+      Throws: body.throws || "",
+      Bats: body.bats || "",
+      OverhandSpeed: body.overhandSpeed || "",
+      Number: body.number || "",
+      Parent1Name: body.parent1Name || "",
+      Parent1Email: body.parent1Email || "",
+      Parent1Phone: body.parent1Phone || "",
+      Parent2Name: body.parent2Name || "",
+      Parent2Email: body.parent2Email || "",
+      Parent2Phone: body.parent2Phone || "",
+      Address: body.address || "",
+      City: body.city || "",
+      State: body.state || "",
+      Zip: body.zip || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "logFundraiserSale") {
+    var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
+    backfillIds_(fsSheet);
+    appendRowByHeaders_(fsSheet, {
+      Id: newId_(),
+      FundraiserId: body.fundraiserId,
+      Player: body.player,
+      Units: body.units,
+      Date: new Date().toISOString().slice(0, 10),
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
   } else {
     result = { error: "unknown action" };
   }

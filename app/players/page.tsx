@@ -14,6 +14,58 @@ import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
+type PlayerProfile = {
+  Player: string; DOB: string; HeightFt: string; HeightIn: string; Weight: string;
+  Throws: string; Bats: string; OverhandSpeed: string; Number: string;
+  Parent1Name: string; Parent1Email: string; Parent1Phone: string;
+  Parent2Name: string; Parent2Email: string; Parent2Phone: string;
+  Address: string; City: string; State: string; Zip: string;
+};
+
+function ProfileCard({ profile }: { profile: PlayerProfile }) {
+  const height = profile.HeightFt ? `${profile.HeightFt}'${profile.HeightIn || "0"}"` : "—";
+  const rows: { label: string; value: string }[] = [
+    { label: "DOB", value: profile.DOB || "—" },
+    { label: "Height", value: height },
+    { label: "Weight", value: profile.Weight ? `${profile.Weight} lbs` : "—" },
+    { label: "Throws", value: profile.Throws || "—" },
+    { label: "Bats", value: profile.Bats || "—" },
+    { label: "Overhand Speed", value: profile.OverhandSpeed ? `${profile.OverhandSpeed} mph` : "—" },
+  ];
+  const parents = [
+    { name: profile.Parent1Name, email: profile.Parent1Email, phone: profile.Parent1Phone },
+    { name: profile.Parent2Name, email: profile.Parent2Email, phone: profile.Parent2Phone },
+  ].filter((p) => p.name);
+  const address = [profile.Address, profile.City, profile.State, profile.Zip].filter(Boolean).join(", ");
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="rounded-lg border border-white/10 bg-white/3 p-4 flex flex-col gap-2">
+        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-1">Athlete</p>
+        {rows.map((r) => (
+          <div key={r.label} className="flex justify-between text-sm">
+            <span className="text-white/40">{r.label}</span>
+            <span className="font-medium">{r.value}</span>
+          </div>
+        ))}
+      </div>
+      {parents.map((p, i) => (
+        <div key={i} className="rounded-lg border border-white/10 bg-white/3 p-4 flex flex-col gap-2">
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-1">Parent / Guardian {i + 1}</p>
+          <p className="font-semibold text-sm">{p.name}</p>
+          {p.email && <p className="text-sm text-white/60">{p.email}</p>}
+          {p.phone && <p className="text-sm text-white/60">{p.phone}</p>}
+        </div>
+      ))}
+      {address && (
+        <div className="rounded-lg border border-white/10 bg-white/3 p-4">
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-1">Address</p>
+          <p className="text-sm">{address}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PlayerContent() {
   const searchParams = useSearchParams();
@@ -25,6 +77,7 @@ function PlayerContent() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
   const [footageNotes, setFootageNotes] = useState<RawFootageNoteRow[]>([]);
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(playerName));
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -34,12 +87,14 @@ function PlayerContent() {
     if (!playerName) return;
     setLoading(true);
     try {
-      const [players, entries, metricRows, notes] = await Promise.all([
+      const [players, entries, metricRows, notes, profiles] = await Promise.all([
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries", { player: playerName }) as Promise<RawEntryRow[]>,
         sheetsGet("metrics", { player: playerName }) as Promise<RawMetricRow[]>,
         sheetsGet("footageNotes", { player: playerName }) as Promise<RawFootageNoteRow[]>,
+        (sheetsGet("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
       ]);
+      setProfile(profiles.find((p) => p.Player.trim().toLowerCase() === playerName.trim().toLowerCase()) ?? null);
       const match = players.find(
         (p) => p.Name.trim().toLowerCase() === playerName.trim().toLowerCase()
       );
@@ -223,6 +278,20 @@ function PlayerContent() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {unlocked && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-bold tracking-wide">Player &amp; Family Profile</h2>
+          {profile ? (
+            <ProfileCard profile={profile} />
+          ) : (
+            <div className="rounded-lg border border-white/10 bg-white/3 p-4 text-sm text-white/40">
+              No profile submitted yet.{" "}
+              <Link href="/intake" className="text-accent hover:underline">Share the intake form</Link> with this family.
+            </div>
+          )}
         </div>
       )}
     </div>
