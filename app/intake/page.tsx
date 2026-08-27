@@ -17,7 +17,6 @@ type FormData = {
   throws: string;
   bats: string;
   overhandSpeed: string;
-  number: string;
   // Parent 1
   parent1Name: string;
   parent1Email: string;
@@ -35,7 +34,7 @@ type FormData = {
 
 const EMPTY: FormData = {
   player: "", dob: "", heightFt: "", heightIn: "", weight: "",
-  throws: "", bats: "", overhandSpeed: "", number: "",
+  throws: "", bats: "", overhandSpeed: "",
   parent1Name: "", parent1Email: "", parent1Phone: "",
   parent2Name: "", parent2Email: "", parent2Phone: "",
   address: "", city: "", state: "", zip: "",
@@ -152,14 +151,9 @@ export default function IntakePage() {
               <Field label="Date of Birth">
                 <input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)} className={inputCls} />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Jersey Number">
-                  <input type="text" value={form.number} onChange={(e) => set("number", e.target.value)} placeholder="e.g. 12" className={inputCls} />
-                </Field>
-                <Field label="Weight (lbs)">
-                  <input type="number" value={form.weight} onChange={(e) => set("weight", e.target.value)} placeholder="e.g. 145" className={inputCls} />
-                </Field>
-              </div>
+              <Field label="Weight (lbs)">
+                <input type="number" value={form.weight} onChange={(e) => set("weight", e.target.value)} placeholder="e.g. 145" className={inputCls} />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Height (ft)">
                   <input type="number" value={form.heightFt} onChange={(e) => set("heightFt", e.target.value)} placeholder="5" className={inputCls} />
@@ -185,9 +179,6 @@ export default function IntakePage() {
                   </select>
                 </Field>
               </div>
-              <Field label="Current Overhand Speed (mph)">
-                <input type="number" value={form.overhandSpeed} onChange={(e) => set("overhandSpeed", e.target.value)} placeholder="e.g. 68" className={inputCls} />
-              </Field>
             </section>
 
             {/* Parent 1 */}
