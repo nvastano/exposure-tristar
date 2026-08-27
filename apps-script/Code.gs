@@ -18,6 +18,7 @@ var PRACTICE_PLAN_ITEMS_SHEET = "PracticePlanItems";
 var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
 var TRIVIA_RESPONSES_SHEET = "TriviaResponses";
 var FUNDRAISER_SALES_SHEET = "FundraiserSales";
+var PLAYER_PROFILES_SHEET = "PlayerProfiles";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -343,6 +344,8 @@ function doGet(e) {
     result = allPlanItems;
   } else if (action === "fundraiserSales") {
     result = rowsToObjects_(getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]).getDataRange().getValues());
+  } else if (action === "playerProfiles") {
+    result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"]).getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -778,6 +781,34 @@ function doPost(e) {
       ensurePlanDrill_(n);
     });
     result = { ok: true, count: (body.names || []).length };
+  } else if (body.action === "logPlayerProfile") {
+    var ppHeaders = ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"];
+    var ppSheet = getSheet_(PLAYER_PROFILES_SHEET, ppHeaders);
+    backfillIds_(ppSheet);
+    appendRowByHeaders_(ppSheet, {
+      Id: newId_(),
+      Player: body.player,
+      DOB: body.dob || "",
+      HeightFt: body.heightFt || "",
+      HeightIn: body.heightIn || "",
+      Weight: body.weight || "",
+      Throws: body.throws || "",
+      Bats: body.bats || "",
+      OverhandSpeed: body.overhandSpeed || "",
+      Number: body.number || "",
+      Parent1Name: body.parent1Name || "",
+      Parent1Email: body.parent1Email || "",
+      Parent1Phone: body.parent1Phone || "",
+      Parent2Name: body.parent2Name || "",
+      Parent2Email: body.parent2Email || "",
+      Parent2Phone: body.parent2Phone || "",
+      Address: body.address || "",
+      City: body.city || "",
+      State: body.state || "",
+      Zip: body.zip || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
   } else if (body.action === "logFundraiserSale") {
     var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
     backfillIds_(fsSheet);
