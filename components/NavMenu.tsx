@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
+import { isCoachUnlocked, onCoachUnlockChanged, tryUnlockCoach } from "@/lib/coachAuth";
 
 const PLAYER_LINKS = [
   { href: "/", label: "DRILLS" },
@@ -19,10 +19,50 @@ const COACH_LINKS = [
   { href: "/coaches?tab=footage", label: "Coaching Footage" },
 ];
 
+function CoachLoginModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState(false);
+
+  function attempt() {
+    if (tryUnlockCoach(pw)) { onUnlock(); onClose(); }
+    else { setError(true); setPw(""); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#111] border border-white/10 rounded-xl p-6 w-80 flex flex-col gap-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h2 className="text-lg font-bold tracking-wide">Coach Login</h2>
+          <p className="text-white/40 text-sm mt-0.5">Enter the coach password to access the Coaches section.</p>
+        </div>
+        <input
+          autoFocus
+          type="password"
+          value={pw}
+          onChange={(e) => { setPw(e.target.value); setError(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") attempt(); if (e.key === "Escape") onClose(); }}
+          placeholder="Password"
+          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+        />
+        {error && <p className="text-accent text-xs -mt-2">Incorrect password.</p>}
+        <div className="flex gap-2">
+          <button onClick={attempt} className="flex-1 bg-accent hover:bg-accent/80 transition-colors text-white font-semibold py-2 rounded text-sm">
+            Unlock
+          </button>
+          <button onClick={onClose} className="px-4 py-2 rounded border border-white/10 hover:border-white/30 text-white/50 text-sm transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function NavMenu() {
   const [open, setOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -46,6 +86,10 @@ export default function NavMenu() {
 
   return (
     <>
+      {showLogin && (
+        <CoachLoginModal onClose={() => setShowLogin(false)} onUnlock={() => setUnlocked(true)} />
+      )}
+
       {/* Desktop nav */}
       <nav className="hidden md:flex items-center gap-5 text-sm font-semibold tracking-wide">
         {PLAYER_LINKS.map((link) => (
@@ -53,6 +97,14 @@ export default function NavMenu() {
             {link.label}
           </Link>
         ))}
+        {!unlocked && (
+          <button
+            onClick={() => setShowLogin(true)}
+            className="text-white/30 hover:text-white/60 transition-colors text-xs font-semibold tracking-wide"
+          >
+            COACHES
+          </button>
+        )}
         {unlocked && (
           <div className="relative" ref={dropdownRef}>
             <button
@@ -104,6 +156,14 @@ export default function NavMenu() {
               {link.label}
             </Link>
           ))}
+          {!unlocked && (
+            <button
+              onClick={() => { setOpen(false); setShowLogin(true); }}
+              className="px-4 py-3 border-t border-white/10 text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors text-left text-sm font-semibold tracking-wide"
+            >
+              COACHES (Login)
+            </button>
+          )}
           {unlocked && (
             <>
               <div className="px-4 py-2 border-t border-white/10 text-white/30 text-xs tracking-widest uppercase">
