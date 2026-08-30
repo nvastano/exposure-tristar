@@ -43,26 +43,17 @@ const TOURNAMENTS: Tournament[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 function statusChip(t: Tournament) {
-  const today = new Date().toISOString().slice(0, 10);
-  const past = t.isoStart < today;
-  if (t.result) {
-    const [w, l] = t.result.split("–").map(Number);
-    const winning = w > l;
-    return (
-      <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${winning ? "bg-green-500/15 text-green-400" : "bg-accent/10 text-accent"}`}>
-        {t.result}
-      </span>
-    );
+  if (t.format) {
+    return <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded">{t.format}</span>;
   }
-  if (past) return <span className="text-xs text-white/20 italic">No result</span>;
-  return <span className="text-xs font-semibold text-accent/70 bg-accent/10 px-2 py-0.5 rounded">Upcoming</span>;
+  return null;
 }
 
 export default function SchedulePage() {
   const today = new Date().toISOString().slice(0, 10);
-  const sorted = [...TOURNAMENTS].sort((a, b) => a.isoStart.localeCompare(b.isoStart));
-  const upcoming = sorted.filter((t) => t.isoStart >= today);
-  const past = sorted.filter((t) => t.isoStart < today).reverse();
+  const upcoming = [...TOURNAMENTS]
+    .filter((t) => t.isoStart >= today)
+    .sort((a, b) => a.isoStart.localeCompare(b.isoStart));
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,30 +91,14 @@ export default function SchedulePage() {
           />
         </div>
 
-        {/* Tournament list */}
-        <div className="flex flex-col gap-5">
-
-          {upcoming.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="text-xs font-bold tracking-widest text-white/40 uppercase">Upcoming</h2>
-              {upcoming.map((t, i) => (
-                <TournamentCard key={i} t={t} />
-              ))}
-            </div>
-          )}
-
-          {past.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="text-xs font-bold tracking-widest text-white/30 uppercase">Past</h2>
-              {past.map((t, i) => (
-                <TournamentCard key={i} t={t} />
-              ))}
-            </div>
-          )}
-
-          {TOURNAMENTS.length === 0 && (
+        {/* Upcoming list */}
+        <div className="flex flex-col gap-3">
+          <h2 className="text-xs font-bold tracking-widest text-white/40 uppercase">Upcoming</h2>
+          {upcoming.length > 0 ? (
+            upcoming.map((t, i) => <TournamentCard key={i} t={t} />)
+          ) : (
             <div className="rounded-lg border border-white/10 bg-white/3 p-4 text-sm text-white/30">
-              No tournaments scheduled yet.
+              Nothing scheduled yet — check back soon.
             </div>
           )}
         </div>
