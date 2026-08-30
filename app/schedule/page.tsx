@@ -76,32 +76,15 @@ export default function SchedulePage() {
         </a>
       </div>
 
-      {/* Main layout: calendar left, list right on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
-
-        {/* Month calendar */}
-        <div className="rounded-lg border border-white/10 overflow-hidden bg-white/3">
-          <iframe
-            src={MONTH_URL}
-            style={{ border: 0, display: "block" }}
-            width="100%"
-            height="560"
-            frameBorder="0"
-            scrolling="no"
-          />
-        </div>
-
-        {/* Upcoming list */}
-        <div className="flex flex-col gap-3">
-          <h2 className="text-xs font-bold tracking-widest text-white/40 uppercase">Upcoming</h2>
-          {upcoming.length > 0 ? (
-            upcoming.map((t, i) => <TournamentCard key={i} t={t} />)
-          ) : (
-            <div className="rounded-lg border border-white/10 bg-white/3 p-4 text-sm text-white/30">
-              Nothing scheduled yet — check back soon.
-            </div>
-          )}
-        </div>
+      <div className="rounded-lg border border-white/10 overflow-hidden bg-white/3">
+        <iframe
+          src={MONTH_URL}
+          style={{ border: 0, display: "block" }}
+          width="100%"
+          height="650"
+          frameBorder="0"
+          scrolling="no"
+        />
       </div>
     </div>
   );
