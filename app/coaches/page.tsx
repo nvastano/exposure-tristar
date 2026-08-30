@@ -7,6 +7,7 @@ import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 import { sheetsGet } from "@/lib/sheets";
+import GameReports from "@/components/GameReports";
 
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
@@ -15,6 +16,7 @@ const Footage = dynamic(() => import("@/app/footage/page"), { ssr: false, loadin
 
 const TABS = [
   { id: "roster", label: "Roster Profiles" },
+  { id: "reports", label: "Game Reports" },
   { id: "plan", label: "Practice Plan" },
   { id: "stats", label: "Practice Stats" },
   { id: "footage", label: "Coaching Footage" },
@@ -210,6 +212,7 @@ function CoachesInner() {
 
       {/* Tab content */}
       {tab === "roster" && <RosterProfiles />}
+      {tab === "reports" && <GameReports />}
       {tab === "plan" && <PracticePlan />}
       {tab === "stats" && <PracticeStats />}
       {tab === "footage" && <Footage />}
