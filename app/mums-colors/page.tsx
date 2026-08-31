@@ -6,9 +6,6 @@ import LogoLoader from "@/components/LogoLoader";
 
 const FUNDRAISER_ID = "mums-2026";
 const PRICE_PER_MUM = 25;
-const COST_PER_MUM = 10;
-// Profit that stays with the team = sale price - wholesale cost
-const PROFIT_PER_MUM = PRICE_PER_MUM - COST_PER_MUM;
 
 const COLORS = [
   { key: "red",      label: "Red",       emoji: "🔴" },
@@ -81,7 +78,7 @@ export default function MumsColorsPage() {
     [counts]
   );
 
-  const amountDue = playerTotal * PROFIT_PER_MUM;
+  const amountDue = playerTotal * PRICE_PER_MUM;
 
   function setCount(key: ColorKey, val: string) {
     setCounts((prev) => ({ ...prev, [key]: val.replace(/\D/g, "") }));
@@ -127,7 +124,7 @@ export default function MumsColorsPage() {
         <div className="rounded-lg border border-white/10 bg-white/5 px-6 py-4 w-full">
           <p className="text-xs text-white/40 mb-1">Amount to Venmo</p>
           <p className="text-3xl font-black font-mono text-accent">${amountDue}</p>
-          <p className="text-xs text-white/30 mt-1">({playerTotal} mums × ${PROFIT_PER_MUM} profit each)</p>
+          <p className="text-xs text-white/30 mt-1">({playerTotal} mums × ${PRICE_PER_MUM} each)</p>
         </div>
         <p className="text-white/30 text-xs">Venmo details will be shared by the coach separately.</p>
       </div>
@@ -198,7 +195,7 @@ export default function MumsColorsPage() {
             <div className="text-right">
               <p className="text-xs text-white/40">Amount to Venmo</p>
               <p className="text-2xl font-black font-mono text-accent">${amountDue}</p>
-              <p className="text-[10px] text-white/30">${PROFIT_PER_MUM} profit × {playerTotal}</p>
+              <p className="text-[10px] text-white/30">${PRICE_PER_MUM} × {playerTotal} mums</p>
             </div>
           </div>
         )}

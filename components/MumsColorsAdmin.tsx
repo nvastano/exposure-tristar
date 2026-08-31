@@ -6,8 +6,6 @@ import LogoLoader from "@/components/LogoLoader";
 
 const FUNDRAISER_ID = "mums-2026";
 const PRICE_PER_MUM = 25;
-const COST_PER_MUM = 10;
-const PROFIT_PER_MUM = PRICE_PER_MUM - COST_PER_MUM;
 
 const COLORS = [
   { key: "Red",      label: "Red",       emoji: "🔴" },
@@ -117,7 +115,7 @@ export default function MumsColorsAdmin() {
           <div className="rounded-lg border border-accent/20 bg-accent/5 p-4">
             <p className="text-xs text-white/40">Total Amount Due</p>
             <p className="text-2xl font-black font-mono text-accent">${totals.totalDue.toLocaleString()}</p>
-            <p className="text-[10px] text-white/30 mt-0.5">${PROFIT_PER_MUM} profit/mum</p>
+            <p className="text-[10px] text-white/30 mt-0.5">${PRICE_PER_MUM}/mum</p>
           </div>
         </div>
       </div>
@@ -174,7 +172,7 @@ export default function MumsColorsAdmin() {
             {notSubmitted.map((p) => (
               <div key={p.Name} className="flex items-center justify-between rounded-lg border border-white/5 bg-white/3 px-4 py-2.5">
                 <span className="text-sm text-white/60">{p.Name}</span>
-                <span className="text-xs text-white/30">{playerSales.get(p.Name.trim().toLowerCase()) || 0} mums · ${((playerSales.get(p.Name.trim().toLowerCase()) || 0) * PROFIT_PER_MUM).toLocaleString()} due</span>
+                <span className="text-xs text-white/30">{playerSales.get(p.Name.trim().toLowerCase()) || 0} mums · ${((playerSales.get(p.Name.trim().toLowerCase()) || 0) * PRICE_PER_MUM).toLocaleString()} due</span>
               </div>
             ))}
           </div>
