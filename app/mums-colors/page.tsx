@@ -129,20 +129,6 @@ export default function MumsColorsPage() {
           <p className="text-xs text-white/30 mt-1">({playerTotal} mums × ${PRICE_PER_MUM} each)</p>
         </div>
         <p className="text-white/30 text-xs">Venmo details will be shared by the coach separately.</p>
-        {eligiblePlayers.length > 0 && (
-          <button
-            onClick={() => {
-              setPlayer("");
-              setFirstName("");
-              setLastName("");
-              setCounts(emptyColors());
-              setDone(false);
-            }}
-            className="text-sm text-white/50 hover:text-white underline transition-colors"
-          >
-            Submit for another player
-          </button>
-        )}
       </div>
     );
   }
