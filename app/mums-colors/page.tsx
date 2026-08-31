@@ -37,7 +37,8 @@ export default function MumsColorsPage() {
   const [loading, setLoading] = useState(true);
 
   const [player, setPlayer] = useState("");
-  const [submittedBy, setSubmittedBy] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [counts, setCounts] = useState<ColorCounts>(emptyColors);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -90,7 +91,7 @@ export default function MumsColorsPage() {
     e.preventDefault();
     setError(null);
     if (!player) { setError("Please select your player."); return; }
-    if (!submittedBy.trim()) { setError("Please enter your name."); return; }
+    if (!firstName.trim() || !lastName.trim()) { setError("Please enter your first and last name."); return; }
     if (colorTotal !== playerTotal) {
       setError(`Your color counts add up to ${colorTotal}, but ${player} sold ${playerTotal} mums. Please adjust so they match.`);
       return;
@@ -103,7 +104,7 @@ export default function MumsColorsPage() {
         ...Object.fromEntries(COLORS.map((c) => [c.key, parseInt(counts[c.key]) || 0])),
         totalMums: playerTotal,
         amountDue,
-        submittedBy: submittedBy.trim(),
+        submittedBy: `${firstName.trim()} ${lastName.trim()}`,
       });
       setDone(true);
     } catch {
@@ -169,13 +170,22 @@ export default function MumsColorsPage() {
         {/* Parent name */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold tracking-widest text-white/40 uppercase">Your Name (Parent / Guardian)</label>
-          <input
-            type="text"
-            value={submittedBy}
-            onChange={(e) => setSubmittedBy(e.target.value)}
-            placeholder="First Last"
-            className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="First"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+            />
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Last"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+            />
+          </div>
         </div>
 
         {/* Mums total banner */}
@@ -219,9 +229,26 @@ export default function MumsColorsPage() {
 
           {/* Running total */}
           {player && (
-            <div className={`flex items-center justify-between text-sm px-1 ${colorTotal === playerTotal ? "text-green-400" : "text-white/40"}`}>
-              <span>Color total: <strong>{colorTotal}</strong></span>
-              <span>{colorTotal === playerTotal ? "✓ Matches" : `${playerTotal - colorTotal} remaining`}</span>
+            <div className={`rounded-lg border px-4 py-3 flex items-center justify-between gap-3 ${
+              colorTotal === playerTotal
+                ? "border-green-500/40 bg-green-500/10"
+                : colorTotal > playerTotal
+                ? "border-accent/40 bg-accent/10"
+                : "border-white/20 bg-white/5"
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`text-2xl font-black font-mono ${colorTotal === playerTotal ? "text-green-400" : colorTotal > playerTotal ? "text-accent" : "text-white"}`}>
+                  {colorTotal}
+                </span>
+                <span className="text-white/40 text-sm">/ {playerTotal} colors entered</span>
+              </div>
+              <div className={`text-sm font-bold ${colorTotal === playerTotal ? "text-green-400" : colorTotal > playerTotal ? "text-accent" : "text-white/60"}`}>
+                {colorTotal === playerTotal
+                  ? "✓ Matches — ready to submit"
+                  : colorTotal > playerTotal
+                  ? `${colorTotal - playerTotal} too many`
+                  : `${playerTotal - colorTotal} remaining`}
+              </div>
             </div>
           )}
         </div>
