@@ -6,6 +6,9 @@ import LogoLoader from "@/components/LogoLoader";
 import Modal from "@/components/Modal";
 import Countdown from "@/components/Countdown";
 
+// Players who have closed out — no more sales accepted
+const CLOSED_PLAYERS = ["Hugh Horvath", "Carson Grizzle"];
+
 // ── Swap this out for each new fundraiser ──────────────────────────────────
 const FUNDRAISER = {
   id: "mums-2026",
@@ -280,9 +283,11 @@ export default function FundraiserPage() {
               className="bg-white/5 border border-white/10 rounded px-3 py-2"
             >
               <option value="">Select your name...</option>
-              {players.map((p) => (
-                <option key={p.Name} value={p.Name}>{p.Name}</option>
-              ))}
+              {players
+                .filter((p) => !CLOSED_PLAYERS.includes(p.Name))
+                .map((p) => (
+                  <option key={p.Name} value={p.Name}>{p.Name}</option>
+                ))}
             </select>
           </label>
 
