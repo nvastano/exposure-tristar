@@ -19,6 +19,7 @@ var PRACTICE_PLAN_CATEGORIES_SHEET = "PracticePlanCategories";
 var TRIVIA_RESPONSES_SHEET = "TriviaResponses";
 var FUNDRAISER_SALES_SHEET = "FundraiserSales";
 var PLAYER_PROFILES_SHEET = "PlayerProfiles";
+var MUMS_COLORS_SHEET = "MumsColors";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -346,6 +347,8 @@ function doGet(e) {
     result = rowsToObjects_(getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]).getDataRange().getValues());
   } else if (action === "playerProfiles") {
     result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"]).getDataRange().getValues());
+  } else if (action === "mumsColors") {
+    result = rowsToObjects_(getSheet_(MUMS_COLORS_SHEET, ["Id","FundraiserId","Player","Red","White","Yellow","Bronze","Purple","TriColor","TotalMums","AmountDue","SubmittedBy","CreatedAt"]).getDataRange().getValues());
   } else {
     result = { error: "unknown action" };
   }
@@ -806,6 +809,25 @@ function doPost(e) {
       City: body.city || "",
       State: body.state || "",
       Zip: body.zip || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "logMumsColors") {
+    var mcSheet = getSheet_(MUMS_COLORS_SHEET, ["Id","FundraiserId","Player","Red","White","Yellow","Bronze","Purple","TriColor","TotalMums","AmountDue","SubmittedBy","CreatedAt"]);
+    backfillIds_(mcSheet);
+    appendRowByHeaders_(mcSheet, {
+      Id: newId_(),
+      FundraiserId: body.fundraiserId,
+      Player: body.player,
+      Red: body.red || 0,
+      White: body.white || 0,
+      Yellow: body.yellow || 0,
+      Bronze: body.bronze || 0,
+      Purple: body.purple || 0,
+      TriColor: body.triColor || 0,
+      TotalMums: body.totalMums || 0,
+      AmountDue: body.amountDue || 0,
+      SubmittedBy: body.submittedBy || "",
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
