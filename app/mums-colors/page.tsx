@@ -128,7 +128,11 @@ export default function MumsColorsPage() {
           <p className="text-3xl font-black font-mono text-accent">${amountDue}</p>
           <p className="text-xs text-white/30 mt-1">({playerTotal} mums × ${PRICE_PER_MUM} each)</p>
         </div>
-        <p className="text-white/30 text-xs">Venmo details will be shared by the coach separately.</p>
+        <div className="rounded-lg border border-white/10 bg-white/3 px-6 py-4 w-full text-left flex flex-col gap-1">
+          <p className="text-xs text-white/40">Venmo</p>
+          <p className="text-lg font-bold">@teamhorvath</p>
+          <p className="text-xs text-white/40 mt-0.5">Last 4 digits of phone to confirm: <span className="text-white font-mono">5005</span></p>
+        </div>
       </div>
     );
   }
