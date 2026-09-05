@@ -96,7 +96,7 @@ function RosterProfiles() {
               <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
                 {[
-                  ["DOB", profile.DOB ? (() => { const [y,m,d] = profile.DOB.split("-"); return `${m}/${d}/${y}`; })() : "—"],
+                  ["DOB", profile.DOB ? (() => { try { const d = new Date(profile.DOB); return `${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; } catch { return profile.DOB; } })() : "—"],
                   ["Height", height(profile)],
                   ["Weight", profile.Weight ? `${profile.Weight} lbs` : "—"],
                   ["Throws", profile.Throws || "—"],
