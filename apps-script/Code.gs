@@ -828,29 +828,33 @@ function doPost(e) {
   } else if (body.action === "initDriveUpload") {
     // Returns a Drive resumable upload URL so the browser can PUT the file directly,
     // bypassing the Apps Script ~6MB POST body limit.
-    var dvFolders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
-    var dvFolder = dvFolders.hasNext() ? dvFolders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
-    var token = ScriptApp.getOAuthToken();
-    var metadata = JSON.stringify({ name: body.filename, parents: [dvFolder.getId()] });
-    var initResp = UrlFetchApp.fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
-      {
-        method: "post",
-        headers: {
-          Authorization: "Bearer " + token,
-          "Content-Type": "application/json; charset=UTF-8",
-          "X-Upload-Content-Type": body.mimeType,
-        },
-        payload: metadata,
-        muteHttpExceptions: true,
+    try {
+      var dvFolders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
+      var dvFolder = dvFolders.hasNext() ? dvFolders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
+      var token = ScriptApp.getOAuthToken();
+      var metadata = JSON.stringify({ name: body.filename, parents: [dvFolder.getId()] });
+      var initResp = UrlFetchApp.fetch(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+        {
+          method: "post",
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Type": body.mimeType,
+          },
+          payload: metadata,
+          muteHttpExceptions: true,
+        }
+      );
+      var respHeaders = initResp.getAllHeaders();
+      var uploadUrl = respHeaders["Location"] || respHeaders["location"];
+      if (!uploadUrl) {
+        result = { error: "could not create upload session (status " + initResp.getResponseCode() + "): " + initResp.getContentText() };
+      } else {
+        result = { ok: true, uploadUrl: uploadUrl };
       }
-    );
-    var respHeaders = initResp.getAllHeaders();
-    var uploadUrl = respHeaders["Location"] || respHeaders["location"];
-    if (!uploadUrl) {
-      result = { error: "could not create upload session (status " + initResp.getResponseCode() + "): " + initResp.getContentText() };
-    } else {
-      result = { ok: true, uploadUrl: uploadUrl };
+    } catch (err) {
+      result = { error: "initDriveUpload threw: " + String(err) };
     }
   } else if (body.action === "setDriveSharing") {
     try {
