@@ -54,6 +54,15 @@ function testGroupMeNotify() {
   notifyGroupMe_("Test message from Apps Script 🧪");
 }
 
+// Run this manually from the Apps Script editor to authorize the Drive scope
+// required by initDriveUpload. Select this function in the dropdown, click Run,
+// and approve the permissions dialog.
+function authorizeOAuth() {
+  DriveApp.getRootFolder(); // triggers Drive scope authorization
+  var token = ScriptApp.getOAuthToken();
+  Logger.log("OAuth OK: " + token.slice(0, 20) + "...");
+}
+
 function getSheet_(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(name);
