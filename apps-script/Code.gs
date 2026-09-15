@@ -835,8 +835,8 @@ function doPost(e) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     result = { ok: true, fileId: file.getId(), url: "https://drive.google.com/file/d/" + file.getId() + "/preview" };
   } else if (body.action === "initDriveUpload") {
-    // Returns a Drive resumable upload URL so the browser can PUT the file directly,
-    // bypassing the Apps Script ~6MB POST body limit.
+    // Initiates a Drive resumable upload session server-side, stores the upload URL
+    // in cache keyed by sessionId, returns sessionId to the browser.
     try {
       var dvFolders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
       var dvFolder = dvFolders.hasNext() ? dvFolders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
@@ -850,6 +850,7 @@ function doPost(e) {
             Authorization: "Bearer " + token,
             "Content-Type": "application/json; charset=UTF-8",
             "X-Upload-Content-Type": body.mimeType,
+            "X-Upload-Content-Length": String(body.fileSize),
           },
           payload: metadata,
           muteHttpExceptions: true,
@@ -860,10 +861,50 @@ function doPost(e) {
       if (!uploadUrl) {
         result = { error: "could not create upload session (status " + initResp.getResponseCode() + "): " + initResp.getContentText() };
       } else {
-        result = { ok: true, uploadUrl: uploadUrl };
+        var sessionId = Utilities.getUuid();
+        CacheService.getScriptCache().put(sessionId, uploadUrl, 21600);
+        result = { ok: true, sessionId: sessionId };
       }
     } catch (err) {
       result = { error: "initDriveUpload threw: " + String(err) };
+    }
+  } else if (body.action === "uploadChunk") {
+    // Receives a base64 chunk from the browser and PUTs it to the Drive resumable upload URL.
+    try {
+      var uploadUrl = CacheService.getScriptCache().get(body.sessionId);
+      if (!uploadUrl) {
+        result = { error: "upload session not found or expired" };
+      } else {
+        var chunkBytes = Utilities.base64Decode(body.data);
+        var start = Number(body.start);
+        var totalSize = Number(body.totalSize);
+        var end = start + chunkBytes.length - 1;
+        var contentRange = body.isLast
+          ? "bytes " + start + "-" + end + "/" + totalSize
+          : "bytes " + start + "-" + end + "/*";
+        var putResp = UrlFetchApp.fetch(uploadUrl, {
+          method: "put",
+          headers: {
+            "Content-Range": contentRange,
+            "Content-Type": body.mimeType,
+          },
+          payload: chunkBytes,
+          muteHttpExceptions: true,
+        });
+        var status = putResp.getResponseCode();
+        if (status === 308) {
+          result = { ok: true, status: "incomplete" };
+        } else if (status === 200 || status === 201) {
+          var driveFile = JSON.parse(putResp.getContentText());
+          var fileId = driveFile.id;
+          DriveApp.getFileById(fileId).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          result = { ok: true, status: "complete", fileId: fileId, url: "https://drive.google.com/file/d/" + fileId + "/preview" };
+        } else {
+          result = { error: "Drive returned " + status + ": " + putResp.getContentText().slice(0, 300) };
+        }
+      }
+    } catch (err) {
+      result = { error: "uploadChunk threw: " + String(err) };
     }
   } else if (body.action === "setDriveSharing") {
     try {

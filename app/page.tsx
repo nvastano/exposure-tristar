@@ -649,37 +649,44 @@ function DrillForm({
     setUploadError(null);
     setUploading(true);
     try {
-      // Step 1: get a Drive resumable upload URL from Apps Script
-      let init: Record<string, string>;
-      try {
-        init = await sheetsPost("initDriveUpload", { filename: file.name, mimeType: file.type || "video/mp4" });
-      } catch (err) {
-        throw new Error("Step 1 (init): " + String(err));
-      }
-      if (!init.uploadUrl) throw new Error("Step 1: no uploadUrl — " + JSON.stringify(init));
+      const mimeType = file.type || "video/mp4";
 
-      // Step 2: PUT the file directly to Drive
-      let putRes: Response;
-      try {
-        putRes = await fetch(init.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "video/mp4" },
-          body: file,
+      // Step 1: initiate resumable upload session in Apps Script
+      const init = await sheetsPost("initDriveUpload", { filename: file.name, mimeType, fileSize: file.size });
+      if (!init.sessionId) throw new Error("Init failed: " + JSON.stringify(init));
+
+      // Step 2: send file in 3MB chunks through Apps Script → Drive
+      const CHUNK = 3 * 1024 * 1024;
+      let offset = 0;
+      let fileUrl: string | null = null;
+
+      while (offset < file.size) {
+        const slice = file.slice(offset, offset + CHUNK);
+        const buf = await slice.arrayBuffer();
+        // encode in 32KB pieces to avoid stack overflow
+        const bytes = new Uint8Array(buf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 32768) {
+          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + 32768, bytes.length)));
+        }
+        const b64 = btoa(binary);
+
+        const res = await sheetsPost("uploadChunk", {
+          sessionId: init.sessionId,
+          data: b64,
+          start: offset,
+          totalSize: file.size,
+          mimeType,
+          isLast: offset + slice.size >= file.size,
         });
-      } catch (err) {
-        throw new Error("Step 2 (PUT to Drive): " + String(err));
-      }
-      if (!putRes.ok) {
-        const txt = await putRes.text().catch(() => "");
-        throw new Error(`Step 2: Drive returned ${putRes.status} — ${txt.slice(0, 200)}`);
-      }
-      const driveJson = await putRes.json();
-      const fileId = driveJson.id;
-      if (!fileId) throw new Error("Step 2: no file id in " + JSON.stringify(driveJson));
 
-      // Step 3: set sharing
-      await sheetsPost("setDriveSharing", { fileId });
-      setVideoUrl(`https://drive.google.com/file/d/${fileId}/preview`);
+        if (res.error) throw new Error("Chunk upload failed: " + res.error);
+        if (res.url) fileUrl = res.url;
+        offset += slice.size;
+      }
+
+      if (!fileUrl) throw new Error("Upload finished but no URL returned");
+      setVideoUrl(fileUrl);
     } catch (err) {
       setUploadError(String(err));
     } finally {
