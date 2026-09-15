@@ -845,9 +845,10 @@ function doPost(e) {
         muteHttpExceptions: true,
       }
     );
-    var uploadUrl = initResp.getHeaders()["Location"];
+    var respHeaders = initResp.getAllHeaders();
+    var uploadUrl = respHeaders["Location"] || respHeaders["location"];
     if (!uploadUrl) {
-      result = { error: "could not create upload session: " + initResp.getContentText() };
+      result = { error: "could not create upload session (status " + initResp.getResponseCode() + "): " + initResp.getContentText() };
     } else {
       result = { ok: true, uploadUrl: uploadUrl };
     }

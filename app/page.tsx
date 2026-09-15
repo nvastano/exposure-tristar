@@ -650,23 +650,38 @@ function DrillForm({
     setUploading(true);
     try {
       // Step 1: get a Drive resumable upload URL from Apps Script
-      const init = await sheetsPost("initDriveUpload", { filename: file.name, mimeType: file.type || "video/mp4" });
-      if (!init.uploadUrl) throw new Error("no uploadUrl");
-      // Step 2: PUT the file directly to Drive (bypasses Apps Script size limit)
-      const putRes = await fetch(init.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "video/mp4" },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error("drive upload failed");
+      let init: Record<string, string>;
+      try {
+        init = await sheetsPost("initDriveUpload", { filename: file.name, mimeType: file.type || "video/mp4" });
+      } catch (err) {
+        throw new Error("Step 1 (init): " + String(err));
+      }
+      if (!init.uploadUrl) throw new Error("Step 1: no uploadUrl — " + JSON.stringify(init));
+
+      // Step 2: PUT the file directly to Drive
+      let putRes: Response;
+      try {
+        putRes = await fetch(init.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "video/mp4" },
+          body: file,
+        });
+      } catch (err) {
+        throw new Error("Step 2 (PUT to Drive): " + String(err));
+      }
+      if (!putRes.ok) {
+        const txt = await putRes.text().catch(() => "");
+        throw new Error(`Step 2: Drive returned ${putRes.status} — ${txt.slice(0, 200)}`);
+      }
       const driveJson = await putRes.json();
       const fileId = driveJson.id;
-      if (!fileId) throw new Error("no file id");
-      // Step 3: set sharing so the embed URL works
+      if (!fileId) throw new Error("Step 2: no file id in " + JSON.stringify(driveJson));
+
+      // Step 3: set sharing
       await sheetsPost("setDriveSharing", { fileId });
       setVideoUrl(`https://drive.google.com/file/d/${fileId}/preview`);
-    } catch {
-      setUploadError("Upload failed — file may be too large or connection timed out.");
+    } catch (err) {
+      setUploadError(String(err));
     } finally {
       setUploading(false);
       e.target.value = "";
