@@ -21,6 +21,7 @@ var FUNDRAISER_SALES_SHEET = "FundraiserSales";
 var PLAYER_PROFILES_SHEET = "PlayerProfiles";
 var MUMS_COLORS_SHEET = "MumsColors";
 var PITCH_LOG_SHEET = "PitchLog";
+var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -815,6 +816,14 @@ function doPost(e) {
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
+  } else if (body.action === "uploadDrillVideo") {
+    var folders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
+    var decoded = Utilities.base64Decode(body.data);
+    var blob = Utilities.newBlob(decoded, body.mimeType, body.filename);
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    result = { ok: true, fileId: file.getId(), url: "https://drive.google.com/file/d/" + file.getId() + "/preview" };
   } else if (body.action === "logPitch") {
     var plSheet = getSheet_(PITCH_LOG_SHEET, ["Id","Pitcher","Date","Context","Pitches","Innings","Notes","CreatedAt"]);
     backfillIds_(plSheet);

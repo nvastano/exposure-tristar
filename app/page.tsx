@@ -274,6 +274,7 @@ export default function DrillsPage() {
               section={section}
               drills={drills}
               canEdit={unlocked}
+              coachUnlocked={unlocked}
               isFirst={index === 0}
               isLast={index === categories.length - 1}
               adding={addingTo === section.id}
@@ -332,6 +333,7 @@ function CategorySection({
   onDeleteDrill,
   onSaveDrill,
   categories,
+  coachUnlocked = false,
 }: {
   section: { id: string; name: string; category?: RawDrillCategoryRow };
   drills: RawDrillRow[];
@@ -355,6 +357,7 @@ function CategorySection({
     category: string
   ) => void;
   categories: RawDrillCategoryRow[];
+  coachUnlocked?: boolean;
 }) {
   const { setNodeRef } = useDroppable({ id: `col:${section.id}` });
   const [renaming, setRenaming] = useState(false);
@@ -439,6 +442,7 @@ function CategorySection({
       {canEdit && adding && (
         <DrillForm
           onCancel={onCancelAdd}
+          coachUnlocked={coachUnlocked}
           onSave={(name, description, videoUrl) => onSaveAdd(name, description, videoUrl)}
         />
       )}
@@ -453,6 +457,7 @@ function CategorySection({
                 key={drill.Id}
                 drill={drill}
                 canEdit={canEdit}
+                coachUnlocked={coachUnlocked}
                 onDelete={() => onDeleteDrill(drill)}
                 onSave={(name, description, videoUrl, category) =>
                   onSaveDrill(drill, name, description, videoUrl, category)
@@ -470,12 +475,14 @@ function CategorySection({
 function DraggableDrillCard({
   drill,
   canEdit,
+  coachUnlocked = false,
   onSave,
   onDelete,
   categories,
 }: {
   drill: RawDrillRow;
   canEdit: boolean;
+  coachUnlocked?: boolean;
   onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onDelete: () => void;
   categories: RawDrillCategoryRow[];
@@ -494,6 +501,7 @@ function DraggableDrillCard({
       <DrillCard
         drill={drill}
         canEdit={canEdit}
+        coachUnlocked={coachUnlocked}
         onSave={onSave}
         onDelete={onDelete}
         dragHandleProps={canEdit ? { ...attributes, ...listeners } : undefined}
@@ -506,6 +514,7 @@ function DraggableDrillCard({
 function DrillCard({
   drill,
   canEdit,
+  coachUnlocked,
   onSave,
   onDelete,
   dragHandleProps,
@@ -513,6 +522,7 @@ function DrillCard({
 }: {
   drill: RawDrillRow;
   canEdit: boolean;
+  coachUnlocked?: boolean;
   onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onDelete: () => void;
   dragHandleProps?: Record<string, unknown>;
@@ -528,6 +538,7 @@ function DrillCard({
         initialVideoUrl={drill.VideoUrl}
         initialCategory={drill.Category || UNCATEGORIZED}
         categories={categories}
+        coachUnlocked={coachUnlocked}
         onCancel={() => setEditing(false)}
         onSave={(name, description, videoUrl, category) => {
           onSave(name, description, videoUrl, category);
@@ -608,6 +619,7 @@ function DrillForm({
   initialVideoUrl = "",
   initialCategory,
   categories,
+  coachUnlocked = false,
   onSave,
   onCancel,
 }: {
@@ -616,6 +628,7 @@ function DrillForm({
   initialVideoUrl?: string;
   initialCategory?: string;
   categories?: RawDrillCategoryRow[];
+  coachUnlocked?: boolean;
   onSave: (name: string, description: string, videoUrl: string, category: string) => void;
   onCancel: () => void;
 }) {
@@ -623,6 +636,42 @@ function DrillForm({
   const [description, setDescription] = useState(initialDescription);
   const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
   const [category, setCategory] = useState(initialCategory ?? UNCATEGORIZED);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError("File too large — max 50MB. Trim the clip or upload to Google Drive manually.");
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]); // strip data:...;base64, prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await sheetsPost("uploadDrillVideo", {
+        filename: file.name,
+        mimeType: file.type,
+        data: base64,
+      });
+      if (res.url) setVideoUrl(res.url);
+      else setUploadError("Upload failed — try again.");
+    } catch {
+      setUploadError("Upload failed — file may be too large or connection timed out.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
 
   return (
     <div className="rounded-lg border border-accent/40 p-4 flex flex-col gap-3">
@@ -644,15 +693,32 @@ function DrillForm({
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Video link (YouTube)
+      <div className="flex flex-col gap-1 text-sm">
+        <span>Video (YouTube, Google Drive, or upload)</span>
         <input
           value={videoUrl}
           onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="https://www.youtube.com/watch?v=..."
+          placeholder="https://www.youtube.com/watch?v=... or paste a Drive link"
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
-      </label>
+        {coachUnlocked && (
+          <div className="flex items-center gap-2 mt-1">
+            <label className={`cursor-pointer text-xs px-3 py-1.5 rounded border transition-colors ${uploading ? "border-white/10 text-white/30" : "border-white/20 text-white/50 hover:border-accent/60 hover:text-accent"}`}>
+              {uploading ? "Uploading…" : "↑ Upload video file"}
+              <input
+                type="file"
+                accept="video/*"
+                disabled={uploading}
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+            <span className="text-white/20 text-xs">max 50MB</span>
+          </div>
+        )}
+        {uploadError && <p className="text-accent text-xs">{uploadError}</p>}
+        {uploading && <p className="text-white/40 text-xs">Uploading to Google Drive… this may take a moment.</p>}
+      </div>
       {categories && (
         <label className="flex flex-col gap-1 text-sm">
           Category
