@@ -817,6 +817,7 @@ function doPost(e) {
     });
     result = { ok: true };
   } else if (body.action === "uploadDrillVideo") {
+    // Legacy small-file path (kept for compatibility)
     var folders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
     var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
     var decoded = Utilities.base64Decode(body.data);
@@ -824,6 +825,40 @@ function doPost(e) {
     var file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     result = { ok: true, fileId: file.getId(), url: "https://drive.google.com/file/d/" + file.getId() + "/preview" };
+  } else if (body.action === "initDriveUpload") {
+    // Returns a Drive resumable upload URL so the browser can PUT the file directly,
+    // bypassing the Apps Script ~6MB POST body limit.
+    var dvFolders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
+    var dvFolder = dvFolders.hasNext() ? dvFolders.next() : DriveApp.createFolder(DRILL_VIDEOS_FOLDER);
+    var token = ScriptApp.getOAuthToken();
+    var metadata = JSON.stringify({ name: body.filename, parents: [dvFolder.getId()] });
+    var initResp = UrlFetchApp.fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+      {
+        method: "post",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type": body.mimeType,
+        },
+        payload: metadata,
+        muteHttpExceptions: true,
+      }
+    );
+    var uploadUrl = initResp.getHeaders()["Location"];
+    if (!uploadUrl) {
+      result = { error: "could not create upload session: " + initResp.getContentText() };
+    } else {
+      result = { ok: true, uploadUrl: uploadUrl };
+    }
+  } else if (body.action === "setDriveSharing") {
+    try {
+      var sf = DriveApp.getFileById(body.fileId);
+      sf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      result = { ok: true };
+    } catch (err) {
+      result = { error: String(err) };
+    }
   } else if (body.action === "logPitch") {
     var plSheet = getSheet_(PITCH_LOG_SHEET, ["Id","Pitcher","Date","Context","Pitches","Innings","Notes","CreatedAt"]);
     backfillIds_(plSheet);

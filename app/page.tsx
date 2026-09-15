@@ -642,29 +642,29 @@ function DrillForm({
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadError("File too large — max 50MB. Trim the clip or upload to Google Drive manually.");
+    if (file.size > 200 * 1024 * 1024) {
+      setUploadError("File too large — max 200MB.");
       return;
     }
     setUploadError(null);
     setUploading(true);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]); // strip data:...;base64, prefix
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      // Step 1: get a Drive resumable upload URL from Apps Script
+      const init = await sheetsPost("initDriveUpload", { filename: file.name, mimeType: file.type || "video/mp4" });
+      if (!init.uploadUrl) throw new Error("no uploadUrl");
+      // Step 2: PUT the file directly to Drive (bypasses Apps Script size limit)
+      const putRes = await fetch(init.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "video/mp4" },
+        body: file,
       });
-      const res = await sheetsPost("uploadDrillVideo", {
-        filename: file.name,
-        mimeType: file.type,
-        data: base64,
-      });
-      if (res.url) setVideoUrl(res.url);
-      else setUploadError("Upload failed — try again.");
+      if (!putRes.ok) throw new Error("drive upload failed");
+      const driveJson = await putRes.json();
+      const fileId = driveJson.id;
+      if (!fileId) throw new Error("no file id");
+      // Step 3: set sharing so the embed URL works
+      await sheetsPost("setDriveSharing", { fileId });
+      setVideoUrl(`https://drive.google.com/file/d/${fileId}/preview`);
     } catch {
       setUploadError("Upload failed — file may be too large or connection timed out.");
     } finally {
@@ -713,7 +713,7 @@ function DrillForm({
                 className="hidden"
               />
             </label>
-            <span className="text-white/20 text-xs">max 50MB</span>
+            <span className="text-white/20 text-xs">max 200MB</span>
           </div>
         )}
         {uploadError && <p className="text-accent text-xs">{uploadError}</p>}
