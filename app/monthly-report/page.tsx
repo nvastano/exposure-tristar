@@ -82,7 +82,7 @@ export default function MonthlyReportPage() {
       if (def.type === "number") {
         s.totals[m.Metric] = (s.totals[m.Metric] || 0) + Number(m.Value);
       } else {
-        if (m.Value === "true" || m.Value === "1") {
+        if (m.Value === "true" || m.Value === "1" || m.Value === "yes") {
           s.activities[m.Metric] = (s.activities[m.Metric] || 0) + 1;
         }
       }
