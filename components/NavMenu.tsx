@@ -19,6 +19,7 @@ const COACH_LINKS = [
   { href: "/coaches?tab=plan", label: "Practice Plan" },
   { href: "/coaches?tab=stats", label: "Practice Stats" },
   { href: "/coaches?tab=footage", label: "Coaching Footage" },
+  { href: "/monthly-report", label: "Monthly Report" },
 ];
 
 function CoachLoginModal({ onClose, onUnlock }: { onClose: () => void; onUnlock: () => void }) {
