@@ -68,14 +68,30 @@ function ProfileCard({ profile }: { profile: PlayerProfile }) {
   );
 }
 
+function daysUntilBirthday(dob: string): number | null {
+  if (!dob) return null;
+  const today = new Date();
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return null;
+  const next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+  if (next < today) next.setFullYear(today.getFullYear() + 1);
+  return Math.round((next.getTime() - today.getTime()) / 86400000);
+}
+
 function PlayerRoster() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [profiles, setProfiles] = useState<PlayerProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const { unlocked } = useCoachUnlocked();
 
   useEffect(() => {
-    sheetsGet("players")
-      .then((p) => setPlayers(p as PlayerRow[]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      sheetsGet("players") as Promise<PlayerRow[]>,
+      sheetsGet("playerProfiles").catch(() => []) as Promise<PlayerProfile[]>,
+    ]).then(([p, pr]) => {
+      setPlayers(p);
+      setProfiles(pr);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <LogoLoader />;
@@ -86,6 +102,13 @@ function PlayerRoster() {
     return na - nb;
   });
 
+  const upcomingBirthdays = unlocked
+    ? profiles
+        .map((pr) => ({ name: pr.Player, days: daysUntilBirthday(pr.DOB), dob: pr.DOB }))
+        .filter((b): b is { name: string; days: number; dob: string } => b.days !== null && b.days <= 14)
+        .sort((a, b) => a.days - b.days)
+    : [];
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -93,22 +116,45 @@ function PlayerRoster() {
         <h1 className="text-2xl font-bold tracking-wide">PLAYERS</h1>
         <p className="text-white/50 text-sm mt-1">Select a player to view their stats and activity.</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {sorted.map((p) => (
-          <Link
-            key={p.Id}
-            href={`/players?name=${encodeURIComponent(p.Name)}`}
-            className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/3 p-4 hover:border-accent/50 hover:bg-white/5 transition-colors"
-          >
-            <PlayerPhoto name={p.Name} size={64} />
-            <div className="text-center">
-              {p.Number && (
-                <p className="text-accent text-xs font-bold font-mono">#{p.Number}</p>
-              )}
-              <p className="font-semibold text-sm leading-tight">{p.Name}</p>
+
+      {upcomingBirthdays.length > 0 && (
+        <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/5 p-4 flex flex-col gap-2">
+          <p className="text-xs font-bold tracking-widest text-yellow-400 uppercase">Upcoming Birthdays</p>
+          {upcomingBirthdays.map((b) => (
+            <div key={b.name} className="flex items-center justify-between text-sm">
+              <span className="font-semibold">{b.name}</span>
+              <span className="text-white/50">
+                {b.days === 0 ? "🎂 Today!" : b.days === 1 ? "Tomorrow" : `In ${b.days} days`}
+              </span>
             </div>
-          </Link>
-        ))}
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {sorted.map((p) => {
+          const profile = profiles.find((pr) => pr.Player === p.Name);
+          const days = profile ? daysUntilBirthday(profile.DOB) : null;
+          const isBirthday = days === 0;
+          const isSoon = days !== null && days <= 14;
+          return (
+            <Link
+              key={p.Id}
+              href={`/players?name=${encodeURIComponent(p.Name)}`}
+              className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/3 p-4 hover:border-accent/50 hover:bg-white/5 transition-colors"
+            >
+              <PlayerPhoto name={p.Name} size={64} />
+              <div className="text-center">
+                {p.Number && (
+                  <p className="text-accent text-xs font-bold font-mono">#{p.Number}</p>
+                )}
+                <p className="font-semibold text-sm leading-tight">{p.Name}</p>
+                {unlocked && isBirthday && <p className="text-yellow-400 text-xs mt-0.5">🎂 Birthday!</p>}
+                {unlocked && isSoon && !isBirthday && <p className="text-yellow-400/70 text-xs mt-0.5">🎂 in {days}d</p>}
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
