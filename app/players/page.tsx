@@ -102,12 +102,10 @@ function PlayerRoster() {
     return na - nb;
   });
 
-  const upcomingBirthdays = unlocked
-    ? profiles
-        .map((pr) => ({ name: pr.Player, days: daysUntilBirthday(pr.DOB), dob: pr.DOB }))
-        .filter((b): b is { name: string; days: number; dob: string } => b.days !== null && b.days <= 14)
-        .sort((a, b) => a.days - b.days)
-    : [];
+  const upcomingBirthdays = profiles
+    .map((pr) => ({ name: pr.Player, days: daysUntilBirthday(pr.DOB), dob: pr.DOB }))
+    .filter((b): b is { name: string; days: number; dob: string } => b.days !== null && b.days <= 14)
+    .sort((a, b) => a.days - b.days);
 
   return (
     <div className="flex flex-col gap-6">
@@ -149,8 +147,8 @@ function PlayerRoster() {
                   <p className="text-accent text-xs font-bold font-mono">#{p.Number}</p>
                 )}
                 <p className="font-semibold text-sm leading-tight">{p.Name}</p>
-                {unlocked && isBirthday && <p className="text-yellow-400 text-xs mt-0.5">🎂 Birthday!</p>}
-                {unlocked && isSoon && !isBirthday && <p className="text-yellow-400/70 text-xs mt-0.5">🎂 in {days}d</p>}
+                {isBirthday && <p className="text-yellow-400 text-xs mt-0.5">🎂 Birthday!</p>}
+                {isSoon && !isBirthday && <p className="text-yellow-400/70 text-xs mt-0.5">🎂 in {days}d</p>}
               </div>
             </Link>
           );
