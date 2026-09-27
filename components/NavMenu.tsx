@@ -11,7 +11,6 @@ const PLAYER_LINKS = [
   { href: "/daily-work", label: "DAILY WORK" },
   { href: "/players", label: "PLAYERS" },
   { href: "/schedule", label: "SCHEDULE" },
-  { href: "/fundraiser", label: "🌻 FUNDRAISER" },
 ];
 
 const COACH_LINKS = [
