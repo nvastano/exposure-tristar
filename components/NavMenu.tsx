@@ -26,8 +26,9 @@ function CoachLoginModal({ onClose, onUnlock }: { onClose: () => void; onUnlock:
   const [pw, setPw] = useState("");
   const [error, setError] = useState(false);
 
-  function attempt() {
-    if (tryUnlockCoach(pw)) { onUnlock(); onClose(); }
+  async function attempt() {
+    const ok = await tryUnlockCoach(pw);
+    if (ok) { onUnlock(); onClose(); }
     else { setError(true); setPw(""); }
   }
 
