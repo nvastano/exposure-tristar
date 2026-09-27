@@ -27,8 +27,9 @@ export default function CoachUnlock({
 
   if (unlocked) return null;
 
-  function handleSubmit() {
-    if (tryUnlockCoach(password)) {
+  async function handleSubmit() {
+    const ok = await tryUnlockCoach(password);
+    if (ok) {
       setOpen(false);
       setPassword("");
       setError(false);
