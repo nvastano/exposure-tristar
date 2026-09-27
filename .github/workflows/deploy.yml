@@ -26,6 +26,7 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_SHEETS_WEBAPP_URL: ${{ vars.NEXT_PUBLIC_SHEETS_WEBAPP_URL }}
+          NEXT_PUBLIC_COACH_AUTH_URL: ${{ vars.NEXT_PUBLIC_COACH_AUTH_URL }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
