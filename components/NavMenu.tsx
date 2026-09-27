@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { isCoachUnlocked, onCoachUnlockChanged, tryUnlockCoach } from "@/lib/coachAuth";
 
 const PLAYER_LINKS = [
-  { href: "/", label: "DRILLS" },
+  { href: "/", label: "HOME" },
+  { href: "/drills", label: "DRILLS" },
   { href: "/daily-work", label: "DAILY WORK" },
   { href: "/players", label: "PLAYERS" },
   { href: "/schedule", label: "SCHEDULE" },
