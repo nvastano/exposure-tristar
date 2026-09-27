@@ -17,16 +17,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Team Elite Baseball | Player Development Tracker",
-  description: "Team Elite Baseball — daily work, drills, practice stats, and fundraiser tracker for players.",
+  title: "Team Elite Prime | Player Development Tracker",
+  description: "Team Elite Prime — daily work, drills, practice stats, and fundraiser tracker for players.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Team Elite",
+    title: "Team Elite Prime",
   },
   icons: {
-    icon: "/exposure-tristar/favicon.png",
-    apple: "/exposure-tristar/apple-touch-icon.png",
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -45,7 +45,7 @@ export default function RootLayout({
           <Link href="/" className="flex items-center gap-3 min-w-0 shrink-0">
             <Logo size={48} />
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-lg font-bold tracking-wide truncate">TEAM ELITE BASEBALL</span>
+              <span className="text-lg font-bold tracking-wide truncate">TEAM ELITE PRIME</span>
               <span className="text-xs text-white/50">Player Development Tracker</span>
             </div>
           </Link>
@@ -55,7 +55,7 @@ export default function RootLayout({
         <ScriptureBanner mobile />
         <main className="flex-1 px-4 sm:px-8 py-8 max-w-6xl w-full mx-auto overflow-x-hidden">{children}</main>
         <footer className="print:hidden border-t border-white/10 px-4 sm:px-8 py-4 text-center text-xs text-white/40">
-          Team Elite Baseball
+          Team Elite Prime
         </footer>
       </body>
     </html>

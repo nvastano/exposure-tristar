@@ -118,7 +118,7 @@ export default function IntakePage() {
   return (
     <div className="max-w-xl mx-auto flex flex-col gap-8">
       <div>
-        <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Baseball</p>
+        <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Prime</p>
         <h1 className="text-2xl font-bold tracking-wide">Player & Family Info</h1>
         <p className="text-white/50 text-sm mt-1">
           Please complete this form for your athlete. Each player only needs to be submitted once.

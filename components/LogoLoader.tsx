@@ -2,8 +2,8 @@ export default function LogoLoader({ size = 120, label = "Loading..." }: { size?
   return (
     <div className="flex flex-col items-center gap-4 py-10">
       <img
-        src="/exposure-tristar/te-logo.png"
-        alt="Team Elite Baseball"
+        src="/te-logo.png"
+        alt="Team Elite Prime"
         width={size}
         height={size}
         style={{

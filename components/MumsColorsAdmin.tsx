@@ -83,8 +83,8 @@ export default function MumsColorsAdmin() {
   if (loading) return <LogoLoader />;
 
   const submissionUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/exposure-tristar/mums-colors`
-    : "/exposure-tristar/mums-colors";
+    ? `${window.location.origin}/mums-colors`
+    : "/mums-colors";
 
   return (
     <div className="flex flex-col gap-8">

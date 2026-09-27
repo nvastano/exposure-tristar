@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const BASE_PATH = "/exposure-tristar";
+const BASE_PATH = "";
 
 function slugifyName(name: string) {
   return name.trim().toLowerCase().replace(/\s+/g, "_");
