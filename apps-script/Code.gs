@@ -21,6 +21,7 @@ var FUNDRAISER_SALES_SHEET = "FundraiserSales";
 var PLAYER_PROFILES_SHEET = "PlayerProfiles";
 var MUMS_COLORS_SHEET = "MumsColors";
 var PITCH_LOG_SHEET = "PitchLog";
+var MERCH_ORDERS_SHEET = "MerchOrders";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -944,6 +945,23 @@ function doPost(e) {
       TotalMums: body.totalMums || 0,
       AmountDue: body.amountDue || 0,
       SubmittedBy: body.submittedBy || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "logMerchOrder") {
+    var moSheet = getSheet_(MERCH_ORDERS_SHEET, ["Id","SubmittedAt","PlayerName","ParentName","Email","Phone","Item","Size","Quantity","Notes","CreatedAt"]);
+    backfillIds_(moSheet);
+    appendRowByHeaders_(moSheet, {
+      Id: newId_(),
+      SubmittedAt: body.submittedAt || new Date().toISOString(),
+      PlayerName: body.playerName || "",
+      ParentName: body.parentName || "",
+      Email: body.email || "",
+      Phone: body.phone || "",
+      Item: body.item || "",
+      Size: body.size || "",
+      Quantity: body.quantity || "",
+      Notes: body.notes || "",
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
