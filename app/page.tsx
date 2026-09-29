@@ -28,7 +28,6 @@ export default function HomePage() {
           { href: "/daily-work", label: "Daily Work" },
           { href: "/players", label: "Players" },
           { href: "/schedule", label: "Schedule" },
-          { href: "/store", label: "Store" },
           { href: "/monthly-report", label: "Monthly Report" },
         ].map((link) => (
           <Link
