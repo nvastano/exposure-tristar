@@ -22,6 +22,29 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* Coaches */}
+      <div className="w-full max-w-2xl flex flex-col gap-4">
+        <h2 className="text-xs font-bold tracking-widest text-white/40 uppercase text-center">Coaching Staff</h2>
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { img: "/coaches/sean_grizzle.jpg", name: "Sean Grizzle", role: "Head Coach" },
+            { img: "/coaches/brian_horvath.jpg", name: "Brian Horvath", role: "Assistant Coach" },
+            { img: "/coaches/nick_vastano.jpg", name: "Nick Vastano", role: "Assistant Coach / Tech Dude" },
+          ].map((coach) => (
+            <div key={coach.name} className="flex flex-col items-center gap-2 text-center">
+              <div className="w-full aspect-square rounded-xl overflow-hidden border border-white/10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coach.img} alt={coach.name} className="w-full h-full object-cover object-top" />
+              </div>
+              <div>
+                <p className="text-sm font-bold tracking-wide">{coach.name}</p>
+                <p className="text-xs text-white/40 mt-0.5">{coach.role}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-lg">
         {[
           { href: "/drills", label: "Drills" },
