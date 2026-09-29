@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { sheetsPost } from "@/lib/sheets";
+import { useEffect, useState } from "react";
+import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import LogoLoader from "@/components/LogoLoader";
+
+type PlayerRow = { Id: string; Name: string };
 
 const SIZES = ["YS", "YM", "YL", "YXL", "AS", "AM", "AL", "AXL", "A2XL"];
 
@@ -40,10 +43,18 @@ const inputCls = "bg-white/5 border border-white/10 rounded px-3 py-2 text-white
 const selectCls = inputCls + " appearance-none";
 
 export default function StorePage() {
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (sheetsGet("players") as Promise<PlayerRow[]>)
+      .then(setPlayers)
+      .finally(() => setLoadingPlayers(false));
+  }, []);
 
   function set(field: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -76,6 +87,8 @@ export default function StorePage() {
       setSubmitting(false);
     }
   }
+
+  if (loadingPlayers) return <LogoLoader />;
 
   if (done) {
     return (
@@ -114,13 +127,12 @@ export default function StorePage() {
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Your Info</h2>
           <Field label="Player Name" required>
-            <input
-              type="text"
-              value={form.playerName}
-              onChange={(e) => set("playerName", e.target.value)}
-              placeholder="e.g. Hudson Vastano"
-              className={inputCls}
-            />
+            <select value={form.playerName} onChange={(e) => set("playerName", e.target.value)} className={selectCls}>
+              <option value="">— Select player —</option>
+              {players.map((p) => (
+                <option key={p.Id} value={p.Name}>{p.Name}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Parent / Guardian Name" required>
             <input
