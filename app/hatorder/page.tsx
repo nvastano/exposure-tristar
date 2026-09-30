@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { sheetsGet, sheetsPost } from "@/lib/sheets";
-import LogoLoader from "@/components/LogoLoader";
+import { useState } from "react";
+import { sheetsPost } from "@/lib/sheets";
 
-type PlayerRow = { Id: string; Name: string };
 type LineItem = { size: string; quantity: string };
 
 const SIZES = [
@@ -17,8 +15,7 @@ const SIZES = [
 const EMPTY_LINE: LineItem = { size: "", quantity: "1" };
 
 type FormData = {
-  playerName: string;
-  parentName: string;
+  name: string;
   email: string;
   phone: string;
   lines: LineItem[];
@@ -26,8 +23,7 @@ type FormData = {
 };
 
 const EMPTY: FormData = {
-  playerName: "",
-  parentName: "",
+  name: "",
   email: "",
   phone: "",
   lines: [{ ...EMPTY_LINE }],
@@ -49,18 +45,10 @@ const inputCls = "bg-white/5 border border-white/10 rounded px-3 py-2 text-white
 const selectCls = inputCls + " appearance-none";
 
 export default function HatOrderPage() {
-  const [players, setPlayers] = useState<PlayerRow[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    (sheetsGet("players") as Promise<PlayerRow[]>)
-      .then(setPlayers)
-      .finally(() => setLoadingPlayers(false));
-  }, []);
 
   function setField(field: keyof Omit<FormData, "lines">, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -84,7 +72,7 @@ export default function HatOrderPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.playerName || !form.parentName || !form.email) {
+    if (!form.name || !form.email) {
       setError("Please complete all required fields.");
       return;
     }
@@ -98,11 +86,11 @@ export default function HatOrderPage() {
       await Promise.all(
         form.lines.map((line) =>
           sheetsPost("logMerchOrder", {
-            playerName: form.playerName,
-            parentName: form.parentName,
+            playerName: form.name,
+            parentName: form.name,
             email: form.email,
             phone: form.phone,
-            item: "Hat",
+            item: "Hat (Parent/Coach)",
             size: line.size,
             quantity: line.quantity,
             notes: form.notes,
@@ -118,8 +106,6 @@ export default function HatOrderPage() {
     }
   }
 
-  if (loadingPlayers) return <LogoLoader />;
-
   if (done) {
     const totalQty = form.lines.reduce((sum, l) => sum + parseInt(l.quantity || "1"), 0);
     return (
@@ -128,9 +114,8 @@ export default function HatOrderPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-wide">Order Received!</h1>
           <p className="text-white/50 mt-2">
-            Thanks, <strong className="text-white">{form.parentName}</strong>! We've got your order of{" "}
-            <strong className="text-white">{totalQty} hat{totalQty !== 1 ? "s" : ""}</strong> for{" "}
-            <strong className="text-white">{form.playerName}</strong>.
+            Thanks, <strong className="text-white">{form.name}</strong>! We've got your order of{" "}
+            <strong className="text-white">{totalQty} hat{totalQty !== 1 ? "s" : ""}</strong>.
             Coach will follow up with payment details.
           </p>
           <div className="mt-3 text-sm text-white/40 space-y-0.5">
@@ -159,10 +144,13 @@ export default function HatOrderPage() {
 
       <div>
         <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Prime · 12U</p>
-        <h1 className="text-2xl font-bold tracking-wide">Team Hat Order</h1>
+        <h1 className="text-2xl font-bold tracking-wide">Parent & Coach Hat Order</h1>
         <p className="text-white/50 text-sm mt-1">
-          Champro HC1 Mid Profile · Black with Team Elite logo. Fill out the form to reserve your hat — coach will follow up with payment details once all orders are in.
+          Champro HC1 Mid Profile · Black with Team Elite logo.
         </p>
+        <div className="mt-3 bg-accent/10 border border-accent/30 rounded-lg px-4 py-3 text-sm text-white/80">
+          <strong className="text-white">Note:</strong> This order is for <strong className="text-white">parents and coaches only</strong> — players already received their hats as part of the team gear package.
+        </div>
       </div>
 
       {/* Size guide */}
@@ -180,19 +168,11 @@ export default function HatOrderPage() {
 
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Your Info</h2>
-          <Field label="Player Name" required>
-            <select value={form.playerName} onChange={(e) => setField("playerName", e.target.value)} className={selectCls}>
-              <option value="">— Select player —</option>
-              {players.map((p) => (
-                <option key={p.Id} value={p.Name}>{p.Name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Parent / Guardian Name" required>
+          <Field label="Your Name" required>
             <input
               type="text"
-              value={form.parentName}
-              onChange={(e) => setField("parentName", e.target.value)}
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
               placeholder="e.g. Nick Vastano"
               className={inputCls}
             />
