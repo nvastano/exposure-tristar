@@ -76,11 +76,11 @@ export default function TowelOrderPage() {
       <div className="max-w-lg mx-auto flex flex-col items-center gap-6 py-16 text-center">
         <div className="text-5xl">✅</div>
         <div>
-          <h1 className="text-2xl font-bold tracking-wide">Interest Logged!</h1>
+          <h1 className="text-2xl font-bold tracking-wide">Order Received!</h1>
           <p className="text-white/50 mt-2">
-            Thanks, <strong className="text-white">{form.name}</strong>! We've got you down for{" "}
-            <strong className="text-white">{qty} towel trainer{qty !== 1 ? "s" : ""}</strong>.
-            Ready to pay now? Send <strong className="text-white">${qty * 5}</strong> on Venmo.
+            Thanks, <strong className="text-white">{form.name}</strong>! We've got your order of{" "}
+            <strong className="text-white">{qty} towel trainer{qty !== 1 ? "s" : ""}</strong> for{" "}
+            <strong className="text-white">${qty * 5}</strong>. Go ahead and send payment via Venmo below.
           </p>
           <a
             href={`https://venmo.com/u/NickVastano?txn=pay&amount=${qty * 5}&note=Pitching%20Towel%20Trainer%20x${qty}`}
@@ -126,7 +126,7 @@ export default function TowelOrderPage() {
           <span className="text-white/40 text-sm">per trainer · towel included</span>
         </div>
         <div className="mt-3 bg-accent/10 border border-accent/30 rounded-lg px-4 py-3 text-sm text-white/80">
-          <strong className="text-white">Gauging interest</strong> — fill out below and Coach will follow up with payment details once all orders are in.
+          Submit your order below and pay via Venmo on the next screen.
         </div>
       </div>
 
@@ -192,7 +192,7 @@ export default function TowelOrderPage() {
           disabled={submitting}
           className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold px-6 py-3 rounded disabled:opacity-50"
         >
-          {submitting ? "Submitting..." : "I'm Interested — Submit"}
+          {submitting ? "Submitting..." : "Place Order"}
         </button>
       </form>
     </div>
