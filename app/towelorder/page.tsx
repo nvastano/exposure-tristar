@@ -80,8 +80,16 @@ export default function TowelOrderPage() {
           <p className="text-white/50 mt-2">
             Thanks, <strong className="text-white">{form.name}</strong>! We've got you down for{" "}
             <strong className="text-white">{qty} towel trainer{qty !== 1 ? "s" : ""}</strong>.
-            Coach will follow up with payment details once all interest is collected.
+            Ready to pay now? Send <strong className="text-white">${qty * 5}</strong> on Venmo.
           </p>
+          <a
+            href={`https://venmo.com/u/NickVastano?txn=pay&amount=${qty * 5}&note=Pitching%20Towel%20Trainer%20x${qty}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-block bg-[#008CFF] hover:bg-[#0070cc] transition-colors text-white font-semibold px-6 py-3 rounded text-sm"
+          >
+            Pay ${qty * 5} on Venmo →
+          </a>
         </div>
         <button
           onClick={() => { setForm(EMPTY); setDone(false); }}
