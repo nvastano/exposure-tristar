@@ -147,6 +147,18 @@ export default function HoodieOrderPage() {
 
   return (
     <div className="max-w-xl mx-auto flex flex-col gap-8">
+      {/* Mockup front + back */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl overflow-hidden border border-white/10 shadow-xl bg-black">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/hoodie-front.png" alt="Team Elite Hoodie - front" className="w-full object-contain" />
+        </div>
+        <div className="rounded-xl overflow-hidden border border-white/10 shadow-xl bg-black">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/hoodie-back.png" alt="Team Elite Hoodie - back" className="w-full object-contain" />
+        </div>
+      </div>
+
       <div>
         <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Prime · 12U</p>
         <h1 className="text-2xl font-bold tracking-wide">Team Hoodie Order</h1>

@@ -5,17 +5,13 @@ import { sheetsPost } from "@/lib/sheets";
 
 type LineItem = { size: string; quantity: string };
 
-const SIZES = [
-  { value: "XS/S", label: "XS/S — Fits 6 5/8 – 7" },
-  { value: "S/M",  label: "S/M — Fits 7 – 7 1/4" },
-  { value: "L/XL", label: "L/XL — Fits 7 1/4 – 7 5/8" },
-  { value: "2XL",  label: "2XL — Fits 7 3/4 – 8" },
-];
+const SIZES = ["YS", "YM", "YL", "YXL", "AS", "AM", "AL", "AXL", "A2XL"];
 
 const EMPTY_LINE: LineItem = { size: "", quantity: "1" };
 
 type FormData = {
-  name: string;
+  playerName: string;
+  parentName: string;
   email: string;
   phone: string;
   lines: LineItem[];
@@ -23,7 +19,8 @@ type FormData = {
 };
 
 const EMPTY: FormData = {
-  name: "",
+  playerName: "",
+  parentName: "",
   email: "",
   phone: "",
   lines: [{ ...EMPTY_LINE }],
@@ -44,7 +41,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const inputCls = "bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-white/20 focus:outline-none focus:border-accent/60";
 const selectCls = inputCls + " appearance-none";
 
-export default function HatOrderPage() {
+export default function CageJacketOrderPage() {
   const [form, setForm] = useState<FormData>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -72,12 +69,12 @@ export default function HatOrderPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name || !form.email) {
+    if (!form.playerName || !form.parentName || !form.email) {
       setError("Please complete all required fields.");
       return;
     }
     if (form.lines.some((l) => !l.size)) {
-      setError("Please select a size for each hat.");
+      setError("Please select a size for each jacket.");
       return;
     }
     setError(null);
@@ -86,11 +83,11 @@ export default function HatOrderPage() {
       await Promise.all(
         form.lines.map((line) =>
           sheetsPost("logMerchOrder", {
-            playerName: form.name,
-            parentName: form.name,
+            playerName: form.playerName,
+            parentName: form.parentName,
             email: form.email,
             phone: form.phone,
-            item: "Hat (Parent/Coach)",
+            item: "Cage Jacket",
             size: line.size,
             quantity: line.quantity,
             notes: form.notes,
@@ -114,8 +111,9 @@ export default function HatOrderPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-wide">Order Received!</h1>
           <p className="text-white/50 mt-2">
-            Thanks, <strong className="text-white">{form.name}</strong>! We've got your order of{" "}
-            <strong className="text-white">{totalQty} hat{totalQty !== 1 ? "s" : ""}</strong>.
+            Thanks, <strong className="text-white">{form.parentName}</strong>! We've got your order of{" "}
+            <strong className="text-white">{totalQty} cage jacket{totalQty !== 1 ? "s" : ""}</strong> for{" "}
+            <strong className="text-white">{form.playerName}</strong>.
             Coach will follow up with payment details.
           </p>
           <div className="mt-3 text-sm text-white/40 space-y-0.5">
@@ -136,43 +134,38 @@ export default function HatOrderPage() {
 
   return (
     <div className="max-w-xl mx-auto flex flex-col gap-8">
-      {/* Hat preview */}
+      {/* Mockup */}
       <div className="w-full rounded-xl overflow-hidden border border-white/10 shadow-xl bg-black">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hat-mockup.png" alt="Team Elite Prime Hat" className="w-full object-contain" />
+        <img src="/cage-jacket-mockup.png" alt="Team Elite Cage Jacket" className="w-full object-contain" />
       </div>
 
       <div>
         <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Prime · 12U</p>
-        <h1 className="text-2xl font-bold tracking-wide">Parent & Coach Hat Order</h1>
+        <h1 className="text-2xl font-bold tracking-wide">Cage Jacket Order</h1>
         <p className="text-white/50 text-sm mt-1">
-          Champro HC1 Mid Profile · Black with Team Elite logo.
+          Black short-sleeve cage jacket with Team Elite logo.
         </p>
-        <div className="mt-3 bg-accent/10 border border-accent/30 rounded-lg px-4 py-3 text-sm text-white/80">
-          <strong className="text-white">Note:</strong> This order is for <strong className="text-white">parents and coaches only</strong> — players already received their hats as part of the team gear package.
-        </div>
-      </div>
-
-      {/* Size guide */}
-      <div className="bg-white/3 border border-white/8 rounded-lg p-4 flex flex-col gap-2">
-        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-1">Size Guide</p>
-        {SIZES.map((s) => (
-          <div key={s.value} className="flex justify-between text-sm">
-            <span className="font-semibold">{s.value}</span>
-            <span className="text-white/40">{s.label.split("—")[1].trim()}</span>
-          </div>
-        ))}
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Your Info</h2>
-          <Field label="Your Name" required>
+          <Field label="Player Name" required>
             <input
               type="text"
-              value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              value={form.playerName}
+              onChange={(e) => setField("playerName", e.target.value)}
+              placeholder="e.g. Jake Vastano"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Parent / Guardian Name" required>
+            <input
+              type="text"
+              value={form.parentName}
+              onChange={(e) => setField("parentName", e.target.value)}
               placeholder="e.g. Nick Vastano"
               className={inputCls}
             />
@@ -198,7 +191,7 @@ export default function HatOrderPage() {
         </section>
 
         <section className="flex flex-col gap-4">
-          <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Hats</h2>
+          <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Jackets</h2>
           {form.lines.map((line, i) => (
             <div key={i} className="flex items-end gap-3">
               <div className="flex-1">
@@ -206,7 +199,7 @@ export default function HatOrderPage() {
                   <select value={line.size} onChange={(e) => setLine(i, "size", e.target.value)} className={selectCls}>
                     <option value="">— Size —</option>
                     {SIZES.map((s) => (
-                      <option key={s.value} value={s.value}>{s.value}</option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </Field>
@@ -260,7 +253,7 @@ export default function HatOrderPage() {
           disabled={submitting}
           className="bg-accent hover:bg-accent/80 transition-colors text-white font-semibold px-6 py-3 rounded disabled:opacity-50"
         >
-          {submitting ? "Submitting..." : "Submit Order"}
+          {submitting ? "Submitting..." : "Place Order"}
         </button>
       </form>
     </div>
