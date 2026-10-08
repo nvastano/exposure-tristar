@@ -148,6 +148,10 @@ export default function HatOrderPage() {
         <p className="text-white/50 text-sm mt-1">
           Champro HC1 Mid Profile · Black with Team Elite logo.
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-2xl font-black text-white">$20</span>
+          <span className="text-white/40 text-sm">per hat</span>
+        </div>
         <div className="mt-3 bg-accent/10 border border-accent/30 rounded-lg px-4 py-3 text-sm text-white/80">
           <strong className="text-white">Note:</strong> This order is for <strong className="text-white">parents and coaches only</strong> — players already received their hats as part of the team gear package.
         </div>

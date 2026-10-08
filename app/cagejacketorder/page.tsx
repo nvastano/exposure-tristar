@@ -146,6 +146,10 @@ export default function CageJacketOrderPage() {
         <p className="text-white/50 text-sm mt-1">
           Black short-sleeve cage jacket with Team Elite logo.
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-2xl font-black text-white">$36</span>
+          <span className="text-white/40 text-sm">per jacket</span>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">

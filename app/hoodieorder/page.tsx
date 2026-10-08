@@ -165,6 +165,10 @@ export default function HoodieOrderPage() {
         <p className="text-white/50 text-sm mt-1">
           Fill out the form below to reserve your hoodie. Coach will reach out with payment details once all orders are collected.
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-2xl font-black text-white">$40</span>
+          <span className="text-white/40 text-sm">per hoodie</span>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
