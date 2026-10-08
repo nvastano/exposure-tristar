@@ -144,7 +144,7 @@ export default function CageJacketOrderPage() {
         <p className="text-accent text-xs font-bold tracking-widest uppercase mb-1">Team Elite Prime · 12U</p>
         <h1 className="text-2xl font-bold tracking-wide">Cage Jacket Order</h1>
         <p className="text-white/50 text-sm mt-1">
-          Black short-sleeve cage jacket with Team Elite logo.
+          Black short-sleeve cage jacket with Team Elite logo. Players only.
         </p>
         <div className="mt-3 flex items-center gap-3">
           <span className="text-2xl font-black text-white">$36</span>

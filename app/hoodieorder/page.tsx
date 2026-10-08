@@ -11,7 +11,10 @@ const SIZES = ["YS", "YM", "YL", "YXL", "AS", "AM", "AL", "AXL", "A2XL"];
 
 const EMPTY_LINE: LineItem = { size: "", quantity: "1" };
 
+type Recipient = "player" | "family";
+
 type FormData = {
+  recipient: Recipient;
   playerName: string;
   parentName: string;
   email: string;
@@ -21,6 +24,7 @@ type FormData = {
 };
 
 const EMPTY: FormData = {
+  recipient: "player",
   playerName: "",
   parentName: "",
   email: "",
@@ -51,6 +55,9 @@ export default function HoodieOrderPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isPlayer = form.recipient === "player";
+  const priceEach = isPlayer ? 50 : 40;
+
   useEffect(() => {
     (sheetsGet("players") as Promise<PlayerRow[]>)
       .then(setPlayers)
@@ -79,7 +86,7 @@ export default function HoodieOrderPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.playerName || !form.parentName || !form.email) {
+    if ((isPlayer && !form.playerName) || !form.parentName || !form.email) {
       setError("Please complete all required fields.");
       return;
     }
@@ -90,15 +97,14 @@ export default function HoodieOrderPage() {
     setError(null);
     setSubmitting(true);
     try {
-      // Submit one row per line item
       await Promise.all(
         form.lines.map((line) =>
           sheetsPost("logMerchOrder", {
-            playerName: form.playerName,
+            playerName: isPlayer ? form.playerName : "",
             parentName: form.parentName,
             email: form.email,
             phone: form.phone,
-            item: "Hoodie",
+            item: isPlayer ? "Hoodie (Player)" : "Hoodie (Family)",
             size: line.size,
             quantity: line.quantity,
             notes: form.notes,
@@ -125,8 +131,8 @@ export default function HoodieOrderPage() {
           <h1 className="text-2xl font-bold tracking-wide">Order Received!</h1>
           <p className="text-white/50 mt-2">
             Thanks, <strong className="text-white">{form.parentName}</strong>! We've got your order of{" "}
-            <strong className="text-white">{totalQty} hoodie{totalQty !== 1 ? "s" : ""}</strong> for{" "}
-            <strong className="text-white">{form.playerName}</strong>.
+            <strong className="text-white">{totalQty} hoodie{totalQty !== 1 ? "s" : ""}</strong>
+            {isPlayer && <> for <strong className="text-white">{form.playerName}</strong></>}.
             Coach will follow up with payment details.
           </p>
           <div className="mt-3 text-sm text-white/40 space-y-0.5">
@@ -165,9 +171,15 @@ export default function HoodieOrderPage() {
         <p className="text-white/50 text-sm mt-1">
           Fill out the form below to reserve your hoodie. Coach will reach out with payment details once all orders are collected.
         </p>
-        <div className="mt-3 flex items-center gap-3">
-          <span className="text-2xl font-black text-white">$40</span>
-          <span className="text-white/40 text-sm">per hoodie</span>
+        <div className="mt-3 flex gap-6 text-sm">
+          <div>
+            <span className="text-xl font-black text-white">$40</span>
+            <span className="text-white/40 ml-2">family · front logo only</span>
+          </div>
+          <div>
+            <span className="text-xl font-black text-white">$50</span>
+            <span className="text-white/40 ml-2">player · front logo + back number</span>
+          </div>
         </div>
       </div>
 
@@ -175,15 +187,45 @@ export default function HoodieOrderPage() {
 
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase border-b border-white/10 pb-2">Your Info</h2>
-          <Field label="Player Name" required>
-            <select value={form.playerName} onChange={(e) => setField("playerName", e.target.value)} className={selectCls}>
-              <option value="">— Select player —</option>
-              {players.map((p) => (
-                <option key={p.Id} value={p.Name}>{p.Name}</option>
+
+          {/* Recipient toggle */}
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-white/60 font-medium">Who is this hoodie for?<span className="text-accent ml-1">*</span></span>
+            <div className="grid grid-cols-2 gap-2">
+              {(["player", "family"] as Recipient[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, recipient: r, playerName: "" }))}
+                  className={`py-2.5 rounded border text-sm font-semibold transition-colors ${
+                    form.recipient === r
+                      ? "bg-accent/20 border-accent text-white"
+                      : "bg-white/5 border-white/10 text-white/50 hover:border-white/30"
+                  }`}
+                >
+                  {r === "player" ? "Player ($50)" : "Family ($40)"}
+                </button>
               ))}
-            </select>
-          </Field>
-          <Field label="Parent / Guardian Name" required>
+            </div>
+            <p className="text-white/30 text-xs mt-1">
+              {isPlayer
+                ? "Front logo + back player number — $10 added for number"
+                : "Front logo only"}
+            </p>
+          </div>
+
+          {isPlayer && (
+            <Field label="Player Name" required>
+              <select value={form.playerName} onChange={(e) => setField("playerName", e.target.value)} className={selectCls}>
+                <option value="">— Select player —</option>
+                {players.map((p) => (
+                  <option key={p.Id} value={p.Name}>{p.Name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          <Field label={isPlayer ? "Parent / Guardian Name" : "Your Name"} required>
             <input
               type="text"
               value={form.parentName}
@@ -267,6 +309,16 @@ export default function HoodieOrderPage() {
             />
           </Field>
         </section>
+
+        {/* Order total */}
+        {form.lines.length > 0 && (
+          <div className="flex justify-between items-center text-sm border-t border-white/10 pt-4">
+            <span className="text-white/40">Estimated total</span>
+            <span className="font-bold text-white">
+              ${form.lines.reduce((sum, l) => sum + (parseInt(l.quantity || "1") * priceEach), 0)}
+            </span>
+          </div>
+        )}
 
         {error && <p className="text-accent text-sm">{error}</p>}
 
