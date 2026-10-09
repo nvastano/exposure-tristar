@@ -5,7 +5,7 @@ import { sheetsPost } from "@/lib/sheets";
 
 type LineItem = { size: string; quantity: string };
 
-const SIZES = ["YS", "YM", "YL", "YXL", "AS", "AM", "AL", "AXL", "A2XL"];
+const SIZES = ["YM", "YL", "AS", "AM", "AL", "AXL", "A2XL", "A3XL", "A4XL"];
 
 const EMPTY_LINE: LineItem = { size: "", quantity: "1" };
 
