@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import { METRIC_CATEGORIES, METRIC_DEFS } from "@/lib/metrics";
+import WeeklyHomework from "@/components/WeeklyHomework";
 import { localDateStr } from "@/lib/stats";
 import { getRandomQuestion } from "@/lib/trivia";
 import TriviaQuestionCard from "@/components/TriviaQuestion";
@@ -130,6 +131,10 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
+
+      <div className="border-t border-white/10 pt-4">
+        <WeeklyHomework />
+      </div>
 
       <div className="flex flex-col gap-6 border-t border-white/10 pt-4">
         <span className="text-sm text-white/50">My Work Today</span>
