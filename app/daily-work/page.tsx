@@ -7,6 +7,7 @@ import DailyDigest from "@/components/DailyDigest";
 import PlayerEntryForm from "@/components/PlayerEntryForm";
 import Modal from "@/components/Modal";
 import LogoLoader from "@/components/LogoLoader";
+import WeeklyHomework from "@/components/WeeklyHomework";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
@@ -63,6 +64,8 @@ export default function DailyPage() {
           + Player Entry
         </button>
       </div>
+
+      <WeeklyHomework />
 
       <DailyDigest players={players} metrics={metrics} triviaResponses={triviaResponses} />
 

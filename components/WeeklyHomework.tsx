@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { sheetsGet } from "@/lib/sheets";
+
+type Task = { id: string; text: string };
+type HomeworkData = { tasks: Task[]; weekOf: string; updatedBy: string; updatedAt: string };
+
+function storageKey(weekOf: string) {
+  return `hw_checked_${weekOf}`;
+}
+
+function loadChecked(weekOf: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(storageKey(weekOf));
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveChecked(weekOf: string, checked: Set<string>) {
+  try {
+    localStorage.setItem(storageKey(weekOf), JSON.stringify([...checked]));
+  } catch {}
+}
+
+export default function WeeklyHomework() {
+  const [data, setData] = useState<HomeworkData | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (sheetsGet("homework") as Promise<HomeworkData>).then((d) => {
+      if (d.tasks?.length) {
+        const normalized = d.tasks.map((t) =>
+          typeof t === "string" ? { id: t, text: t } : t
+        );
+        setData({ ...d, tasks: normalized });
+        setChecked(loadChecked(d.weekOf || ""));
+      }
+    }).finally(() => setLoading(false));
+  }, []);
+
+  function toggle(id: string) {
+    if (!data) return;
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      saveChecked(data.weekOf || "", next);
+      return next;
+    });
+  }
+
+  if (loading || !data || !data.tasks.length) return null;
+
+  const done = data.tasks.filter((t) => checked.has(t.id)).length;
+  const total = data.tasks.length;
+  const pct = Math.round((done / total) * 100);
+
+  const weekLabel = data.weekOf
+    ? new Date(data.weekOf + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold tracking-widest text-white/40 uppercase">My Weekly Homework</h2>
+          {weekLabel && <p className="text-xs text-white/25 mt-0.5">Week of {weekLabel}</p>}
+        </div>
+        <span className="text-xs font-semibold text-white/40">
+          {done}/{total} done
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1 bg-white/8 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-accent rounded-full transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {data.tasks.map((task) => {
+          const isChecked = checked.has(task.id);
+          return (
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => toggle(task.id)}
+              className={`flex items-start gap-3 text-left rounded-lg px-3 py-2.5 border transition-colors ${
+                isChecked
+                  ? "bg-accent/10 border-accent/30 text-white/40"
+                  : "bg-white/3 border-white/8 text-white hover:border-white/20"
+              }`}
+            >
+              <span className={`mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                isChecked ? "bg-accent border-accent" : "border-white/20"
+              }`}>
+                {isChecked && (
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </span>
+              <span className={`text-sm leading-snug ${isChecked ? "line-through" : ""}`}>
+                {task.text}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {done === total && (
+        <div className="text-center text-sm text-accent font-semibold py-2">
+          All done! Great work this week 💪
+        </div>
+      )}
+    </div>
+  );
+}

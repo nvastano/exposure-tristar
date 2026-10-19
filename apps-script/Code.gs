@@ -22,6 +22,7 @@ var PLAYER_PROFILES_SHEET = "PlayerProfiles";
 var MUMS_COLORS_SHEET = "MumsColors";
 var PITCH_LOG_SHEET = "PitchLog";
 var MERCH_ORDERS_SHEET = "MerchOrders";
+var HOMEWORK_SHEET = "Homework";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -363,6 +364,23 @@ function doGet(e) {
     result = rowsToObjects_(getSheet_(PITCH_LOG_SHEET, ["Id","Pitcher","Date","Context","Pitches","Innings","Notes","CreatedAt"]).getDataRange().getValues());
   } else if (action === "mumsColors") {
     result = rowsToObjects_(getSheet_(MUMS_COLORS_SHEET, ["Id","FundraiserId","Player","Red","White","Yellow","Bronze","Purple","TriColor","TotalMums","AmountDue","SubmittedBy","CreatedAt"]).getDataRange().getValues());
+  } else if (action === "homework") {
+    var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
+    var hwData = hwSheet.getDataRange().getValues();
+    if (hwData.length < 2) {
+      result = { tasks: [], weekOf: "", updatedAt: "" };
+    } else {
+      var hwHeaders = hwData[0];
+      var hwLast = hwData[hwData.length - 1];
+      var hwRow = {};
+      hwHeaders.forEach(function(h, i) { hwRow[h] = hwLast[i]; });
+      result = {
+        tasks: JSON.parse(hwRow["Tasks"] || "[]"),
+        weekOf: hwRow["WeekOf"] || "",
+        updatedBy: hwRow["UpdatedBy"] || "",
+        updatedAt: hwRow["UpdatedAt"] || "",
+      };
+    }
   } else {
     result = { error: "unknown action" };
   }
@@ -963,6 +981,16 @@ function doPost(e) {
       Quantity: body.quantity || "",
       Notes: body.notes || "",
       CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "setHomework") {
+    var hwSheet2 = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
+    appendRowByHeaders_(hwSheet2, {
+      Id: newId_(),
+      WeekOf: body.weekOf || new Date().toISOString().slice(0, 10),
+      Tasks: JSON.stringify(body.tasks || []),
+      UpdatedBy: body.updatedBy || "",
+      UpdatedAt: new Date().toISOString(),
     });
     result = { ok: true };
   } else if (body.action === "logFundraiserSale") {
