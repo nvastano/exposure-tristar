@@ -58,9 +58,14 @@ export default function WeeklyHomework() {
   const total = data.tasks.length;
   const pct = Math.round((done / total) * 100);
 
-  const weekLabel = data.weekOf
-    ? new Date(data.weekOf + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    : null;
+  let weekLabel: string | null = null;
+  if (data.weekOf) {
+    // weekOf may be "YYYY-MM-DD" or a full ISO string or a Google Sheets serial
+    const raw = String(data.weekOf).trim();
+    // Try parsing as-is first; if bare date add noon to avoid TZ shift
+    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw + "T12:00:00" : raw);
+    weekLabel = isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
 
   return (
     <div className="flex flex-col gap-3">
