@@ -23,6 +23,7 @@ var MUMS_COLORS_SHEET = "MumsColors";
 var PITCH_LOG_SHEET = "PitchLog";
 var MERCH_ORDERS_SHEET = "MerchOrders";
 var HOMEWORK_SHEET = "Homework";
+var HOMEWORK_COMPLETIONS_SHEET = "HomeworkCompletions";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -364,6 +365,8 @@ function doGet(e) {
     result = rowsToObjects_(getSheet_(PITCH_LOG_SHEET, ["Id","Pitcher","Date","Context","Pitches","Innings","Notes","CreatedAt"]).getDataRange().getValues());
   } else if (action === "mumsColors") {
     result = rowsToObjects_(getSheet_(MUMS_COLORS_SHEET, ["Id","FundraiserId","Player","Red","White","Yellow","Bronze","Purple","TriColor","TotalMums","AmountDue","SubmittedBy","CreatedAt"]).getDataRange().getValues());
+  } else if (action === "homeworkCompletions") {
+    result = rowsToObjects_(getSheet_(HOMEWORK_COMPLETIONS_SHEET, ["Id","Player","WeekOf","CompletedAt"]).getDataRange().getValues());
   } else if (action === "homework") {
     var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
     var hwData = hwSheet.getDataRange().getValues();
@@ -991,6 +994,28 @@ function doPost(e) {
       Tasks: JSON.stringify(body.tasks || []),
       UpdatedBy: body.updatedBy || "",
       UpdatedAt: new Date().toISOString(),
+    });
+    result = { ok: true };
+  } else if (body.action === "logHomeworkCompletion") {
+    var hcSheet = getSheet_(HOMEWORK_COMPLETIONS_SHEET, ["Id","Player","WeekOf","CompletedAt"]);
+    backfillIds_(hcSheet);
+    // Deduplicate: remove any prior completion for same player + weekOf before appending
+    var hcData = hcSheet.getDataRange().getValues();
+    var hcPlayerCol = ensureColumn_(hcSheet, "Player");
+    var hcWeekCol = ensureColumn_(hcSheet, "WeekOf");
+    for (var hci = hcData.length - 1; hci >= 1; hci--) {
+      if (
+        String(hcData[hci][hcPlayerCol - 1]).trim().toLowerCase() === String(body.player || "").trim().toLowerCase() &&
+        String(hcData[hci][hcWeekCol - 1]) === String(body.weekOf || "")
+      ) {
+        hcSheet.deleteRow(hci + 1);
+      }
+    }
+    appendRowByHeaders_(hcSheet, {
+      Id: newId_(),
+      Player: body.player || "",
+      WeekOf: body.weekOf || "",
+      CompletedAt: new Date().toISOString(),
     });
     result = { ok: true };
   } else if (body.action === "logFundraiserSale") {

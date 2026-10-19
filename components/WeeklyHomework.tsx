@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { sheetsGet } from "@/lib/sheets";
+import { useEffect, useRef, useState } from "react";
+import { sheetsGet, sheetsPost } from "@/lib/sheets";
 
 type Task = { id: string; text: string };
 type HomeworkData = { tasks: Task[]; weekOf: string; updatedBy: string; updatedAt: string };
@@ -25,10 +25,11 @@ function saveChecked(weekOf: string, checked: Set<string>) {
   } catch {}
 }
 
-export default function WeeklyHomework() {
+export default function WeeklyHomework({ player }: { player?: string }) {
   const [data, setData] = useState<HomeworkData | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const completionLoggedRef = useRef(false);
 
   useEffect(() => {
     (sheetsGet("homework") as Promise<HomeworkData>).then((d) => {
@@ -48,6 +49,11 @@ export default function WeeklyHomework() {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       saveChecked(data.weekOf || "", next);
+      // Log completion to Sheets when all tasks are checked off
+      if (player && next.size === data.tasks.length && !completionLoggedRef.current) {
+        completionLoggedRef.current = true;
+        sheetsPost("logHomeworkCompletion", { player, weekOf: data.weekOf || "" }).catch(() => {});
+      }
       return next;
     });
   }

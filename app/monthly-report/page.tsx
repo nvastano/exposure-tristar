@@ -8,6 +8,7 @@ import type { RawMetricRow } from "@/lib/metrics";
 import LogoLoader from "@/components/LogoLoader";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
+type HomeworkCompletionRow = { Player: string; WeekOf: string; CompletedAt: string };
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -34,6 +35,7 @@ export default function MonthlyReportPage() {
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
+  const [hwCompletions, setHwCompletions] = useState<HomeworkCompletionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,12 +43,14 @@ export default function MonthlyReportPage() {
     (async () => {
       setLoading(true);
       try {
-        const [p, m] = await Promise.all([
+        const [p, m, hw] = await Promise.all([
           sheetsGet("players") as Promise<PlayerRow[]>,
           sheetsGet("metrics") as Promise<RawMetricRow[]>,
+          (sheetsGet("homeworkCompletions") as Promise<HomeworkCompletionRow[]>).catch(() => []),
         ]);
         setPlayers(p);
         setMetrics(m);
+        setHwCompletions(Array.isArray(hw) ? hw : []);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -99,6 +103,26 @@ export default function MonthlyReportPage() {
       .filter((p) => p.daysLogged > 0)
       .sort((a, b) => b.daysLogged - a.daysLogged || b.streak - a.streak);
   }, [monthMetrics, players]);
+
+  // Homework completions for the selected month
+  const monthHwCompletions = useMemo(() => {
+    const prefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+    return hwCompletions.filter((c) => {
+      // Match on WeekOf or CompletedAt
+      const d = c.WeekOf || c.CompletedAt || "";
+      return d.startsWith(prefix);
+    });
+  }, [hwCompletions, year, month]);
+
+  // Count completions per player for the month
+  const hwByPlayer = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of monthHwCompletions) {
+      const name = String(c.Player || "").trim();
+      if (name) map.set(name, (map.get(name) || 0) + 1);
+    }
+    return map;
+  }, [monthHwCompletions]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const maxDays = Math.max(...playerStats.map((p) => p.daysLogged), 1);
@@ -279,6 +303,25 @@ export default function MonthlyReportPage() {
                           {" "}— {p.streak} consecutive days of work
                         </span>
                       </span>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          )}
+
+          {/* Homework completions */}
+          {hwByPlayer.size > 0 && (
+            <section>
+              <h2 className="text-sm font-bold tracking-widest uppercase text-accent mb-4 print:text-black">
+                Homework Completed
+              </h2>
+              <div className="flex flex-col gap-2">
+                {Array.from(hwByPlayer.entries())
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([name, count]) => (
+                    <div key={name} className="flex items-center justify-between text-sm border-b border-white/5 print:border-gray-100 py-1.5">
+                      <span className="font-semibold">{name}</span>
+                      <span className="tabular-nums text-accent font-bold">{count} week{count !== 1 ? "s" : ""}</span>
                     </div>
                   ))}
               </div>

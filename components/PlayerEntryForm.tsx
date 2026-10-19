@@ -133,7 +133,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       </label>
 
       <div className="border-t border-white/10 pt-4">
-        <WeeklyHomework />
+        <WeeklyHomework player={player || undefined} />
       </div>
 
       <div className="flex flex-col gap-6 border-t border-white/10 pt-4">
