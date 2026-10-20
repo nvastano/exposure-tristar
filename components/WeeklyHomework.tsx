@@ -6,22 +6,24 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 type Task = { id: string; text: string };
 type HomeworkData = { tasks: Task[]; weekOf: string; updatedBy: string; updatedAt: string };
 
-function storageKey(weekOf: string) {
-  return `hw_checked_${weekOf}`;
+function storageKey(weekOf: string, player: string) {
+  return `hw_checked_${weekOf}_${player.trim().toLowerCase()}`;
 }
 
-function loadChecked(weekOf: string): Set<string> {
+function loadChecked(weekOf: string, player: string): Set<string> {
+  if (!player) return new Set();
   try {
-    const raw = localStorage.getItem(storageKey(weekOf));
+    const raw = localStorage.getItem(storageKey(weekOf, player));
     return new Set(raw ? JSON.parse(raw) : []);
   } catch {
     return new Set();
   }
 }
 
-function saveChecked(weekOf: string, checked: Set<string>) {
+function saveChecked(weekOf: string, player: string, checked: Set<string>) {
+  if (!player) return;
   try {
-    localStorage.setItem(storageKey(weekOf), JSON.stringify([...checked]));
+    localStorage.setItem(storageKey(weekOf, player), JSON.stringify([...checked]));
   } catch {}
 }
 
@@ -38,19 +40,29 @@ export default function WeeklyHomework({ player }: { player?: string }) {
           typeof t === "string" ? { id: t, text: t } : t
         );
         setData({ ...d, tasks: normalized });
-        setChecked(loadChecked(d.weekOf || ""));
+        setChecked(loadChecked(d.weekOf || "", player || ""));
       }
     }).finally(() => setLoading(false));
   }, []);
 
+  // Reload checked state when player is selected
+  useEffect(() => {
+    if (data && player) {
+      completionLoggedRef.current = false;
+      setChecked(loadChecked(data.weekOf || "", player));
+    } else if (!player) {
+      setChecked(new Set());
+    }
+  }, [player, data]);
+
   function toggle(id: string) {
-    if (!data) return;
+    if (!data || !player) return;
     setChecked((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      saveChecked(data.weekOf || "", next);
+      saveChecked(data.weekOf || "", player, next);
       // Log completion to Sheets when all tasks are checked off
-      if (player && next.size === data.tasks.length && !completionLoggedRef.current) {
+      if (next.size === data.tasks.length && !completionLoggedRef.current) {
         completionLoggedRef.current = true;
         sheetsPost("logHomeworkCompletion", { player, weekOf: data.weekOf || "" }).catch(() => {});
       }
@@ -101,7 +113,8 @@ export default function WeeklyHomework({ player }: { player?: string }) {
               key={task.id}
               type="button"
               onClick={() => toggle(task.id)}
-              className={`flex items-start gap-3 text-left rounded-lg px-3 py-2.5 border transition-colors ${
+              disabled={!player}
+              className={`flex items-start gap-3 text-left rounded-lg px-3 py-2.5 border transition-colors disabled:cursor-not-allowed ${
                 isChecked
                   ? "bg-accent/10 border-accent/30 text-white/40"
                   : "bg-white/3 border-white/8 text-white hover:border-white/20"
