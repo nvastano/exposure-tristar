@@ -9,15 +9,27 @@ import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
+type HwCompletionRow = { Player: string; WeekOf: string; CompletedAt: string };
+
+// Returns the Monday of the week containing the given YYYY-MM-DD date
+function weekStart(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function DailyDigest({
   players,
   metrics,
   triviaResponses = [],
+  hwCompletions = [],
 }: {
   players: PlayerRow[];
   metrics: RawMetricRow[];
   triviaResponses?: TriviaResponseRow[];
+  hwCompletions?: HwCompletionRow[];
 }) {
   const today = localDateStr();
 
@@ -46,6 +58,18 @@ export default function DailyDigest({
     }
     return map;
   }, [triviaResponses, selectedDate]);
+
+  // Players who completed homework during the week containing selectedDate
+  const hwCompletedSet = useMemo(() => {
+    const week = weekStart(selectedDate);
+    const set = new Set<string>();
+    for (const c of hwCompletions) {
+      if (weekStart(c.WeekOf || c.CompletedAt?.slice(0, 10) || "") === week) {
+        set.add(String(c.Player).trim().toLowerCase());
+      }
+    }
+    return set;
+  }, [hwCompletions, selectedDate]);
 
   const playersWithWork = players.filter((p) => (byPlayer.get(p.Name) || []).length > 0);
 
@@ -120,6 +144,13 @@ export default function DailyDigest({
                     </div>
                   );
                 })()}
+                {hwCompletedSet.has(player.Name.trim().toLowerCase()) && (
+                  <div className="flex items-center gap-2 text-xs rounded px-2 py-1.5 border mt-1 bg-accent/10 border-accent/20 text-accent">
+                    <span>✓</span>
+                    <span className="font-semibold">Homework</span>
+                    <span className="text-white/40">All done this week</span>
+                  </div>
+                )}
               </div>
             );
           })}
