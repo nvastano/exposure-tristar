@@ -9,8 +9,6 @@ import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
-type HwCompletionRow = { Player: string; WeekOf: string; CompletedAt: string };
-
 // Returns the Monday of the week containing the given YYYY-MM-DD date, or "" on invalid input
 function weekStart(dateStr: string): string {
   if (!dateStr) return "";
@@ -26,12 +24,10 @@ export default function DailyDigest({
   players,
   metrics,
   triviaResponses = [],
-  hwCompletions = [],
 }: {
   players: PlayerRow[];
   metrics: RawMetricRow[];
   triviaResponses?: TriviaResponseRow[];
-  hwCompletions?: HwCompletionRow[];
 }) {
   const today = localDateStr();
 
@@ -61,17 +57,17 @@ export default function DailyDigest({
     return map;
   }, [triviaResponses, selectedDate]);
 
-  // Players who completed homework during the week containing selectedDate
+  // Players who logged HomeworkComplete during the week containing selectedDate
   const hwCompletedSet = useMemo(() => {
     const week = weekStart(selectedDate);
     const set = new Set<string>();
-    for (const c of hwCompletions) {
-      if (weekStart(c.WeekOf || c.CompletedAt?.slice(0, 10) || "") === week) {
-        set.add(String(c.Player).trim().toLowerCase());
+    for (const m of metrics) {
+      if (m.Metric === "HomeworkComplete" && weekStart(formatDate(m.Date)) === week) {
+        set.add(String(m.Player).trim().toLowerCase());
       }
     }
     return set;
-  }, [hwCompletions, selectedDate]);
+  }, [metrics, selectedDate]);
 
   const playersWithWork = players.filter((p) => (byPlayer.get(p.Name) || []).length > 0);
 

@@ -8,7 +8,6 @@ import type { RawMetricRow } from "@/lib/metrics";
 import LogoLoader from "@/components/LogoLoader";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
-type HomeworkCompletionRow = { Player: string; WeekOf: string; CompletedAt: string };
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -35,7 +34,6 @@ export default function MonthlyReportPage() {
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [metrics, setMetrics] = useState<RawMetricRow[]>([]);
-  const [hwCompletions, setHwCompletions] = useState<HomeworkCompletionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,14 +41,12 @@ export default function MonthlyReportPage() {
     (async () => {
       setLoading(true);
       try {
-        const [p, m, hw] = await Promise.all([
+        const [p, m] = await Promise.all([
           sheetsGet("players") as Promise<PlayerRow[]>,
           sheetsGet("metrics") as Promise<RawMetricRow[]>,
-          (sheetsGet("homeworkCompletions") as Promise<HomeworkCompletionRow[]>).catch(() => []),
         ]);
         setPlayers(p);
         setMetrics(m);
-        setHwCompletions(Array.isArray(hw) ? hw : []);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -104,25 +100,18 @@ export default function MonthlyReportPage() {
       .sort((a, b) => b.daysLogged - a.daysLogged || b.streak - a.streak);
   }, [monthMetrics, players]);
 
-  // Homework completions for the selected month
-  const monthHwCompletions = useMemo(() => {
-    const prefix = `${year}-${String(month + 1).padStart(2, "0")}`;
-    return hwCompletions.filter((c) => {
-      // Match on WeekOf or CompletedAt
-      const d = c.WeekOf || c.CompletedAt || "";
-      return d.startsWith(prefix);
-    });
-  }, [hwCompletions, year, month]);
-
-  // Count completions per player for the month
+  // Count HomeworkComplete metric entries per player for the selected month
   const hwByPlayer = useMemo(() => {
+    const prefix = `${year}-${String(month + 1).padStart(2, "0")}`;
     const map = new Map<string, number>();
-    for (const c of monthHwCompletions) {
-      const name = String(c.Player || "").trim();
-      if (name) map.set(name, (map.get(name) || 0) + 1);
+    for (const m of metrics) {
+      if (m.Metric === "HomeworkComplete" && formatDate(m.Date).startsWith(prefix)) {
+        const name = String(m.Player || "").trim();
+        if (name) map.set(name, (map.get(name) || 0) + 1);
+      }
     }
     return map;
-  }, [monthHwCompletions]);
+  }, [metrics, year, month]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const maxDays = Math.max(...playerStats.map((p) => p.daysLogged), 1);

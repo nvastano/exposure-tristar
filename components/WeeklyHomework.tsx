@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { localDateStr } from "@/lib/stats";
 
 type Task = { id: string; text: string };
 type HomeworkData = { tasks: Task[]; weekOf: string; updatedBy: string; updatedAt: string };
@@ -61,10 +62,12 @@ export default function WeeklyHomework({ player }: { player?: string }) {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       saveChecked(data.weekOf || "", player, next);
-      // Log completion to Sheets when all tasks are checked off
+      // Log completion as a metric when all tasks are checked off
       if (next.size === data.tasks.length && !completionLoggedRef.current) {
         completionLoggedRef.current = true;
-        sheetsPost("logHomeworkCompletion", { player, weekOf: data.weekOf || "" }).catch(() => {});
+        sheetsPost("bulkMetrics", {
+          entries: [{ date: localDateStr(), player, metric: "HomeworkComplete", value: data.weekOf || localDateStr() }],
+        }).catch(() => {});
       }
       return next;
     });
