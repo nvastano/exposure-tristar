@@ -11,9 +11,11 @@ type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
 type HwCompletionRow = { Player: string; WeekOf: string; CompletedAt: string };
 
-// Returns the Monday of the week containing the given YYYY-MM-DD date
+// Returns the Monday of the week containing the given YYYY-MM-DD date, or "" on invalid input
 function weekStart(dateStr: string): string {
+  if (!dateStr) return "";
   const d = new Date(dateStr + "T12:00:00");
+  if (isNaN(d.getTime())) return "";
   const day = d.getDay(); // 0=Sun
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
