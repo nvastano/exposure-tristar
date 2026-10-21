@@ -81,7 +81,7 @@ function daysUntilBirthday(dob: string): number | null {
 
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string };
 
-function today() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function PlayerRoster() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -110,7 +110,7 @@ function PlayerRoster() {
     return na - nb;
   });
 
-  const now = today();
+  const now = todayStr();
   const assignedPlayers = new Set(
     assignments
       .filter(a => a.StartDate <= now && (!a.EndDate || a.EndDate >= now))
