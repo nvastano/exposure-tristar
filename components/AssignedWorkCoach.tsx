@@ -9,16 +9,43 @@ type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDat
 type PlayerRow = { Id: string; Name: string };
 
 const ARM_CARE_TASKS = [
-  "Band work — external rotation (2×15 each arm)",
-  "Band work — internal rotation (2×15 each arm)",
-  "Band work — scaption (2×15 each arm)",
-  "Prone Y / T / W (2×10 each)",
-  "Wrist flexion + extension stretch (60 sec each)",
-  "Forearm pronation/supination with light weight (2×20)",
-  "Sleeper stretch (60 sec each side)",
-  "Cross-body shoulder stretch (60 sec each side)",
-  "Thoracic spine foam roll (2 min)",
-  "Easy long toss (50–75 ft max — active rest day only)",
+  // MONDAY — Recovery + Mobility (no throwing or hard upper-body)
+  "MON · Easy walk or marching in place | 3 min",
+  "MON · Small and large arm circles, both directions | 2×10",
+  "MON · Gentle shoulder blade squeezes | 2×10",
+  "MON · Thoracic open-book rotations, each side | 1×8",
+  "MON · Cat-cow mobility | 1×10",
+  "MON · Easy child's pose breathing / stretch | 2 min",
+  // TUESDAY — Rotator Cuff + Back (lightest band, perfect control)
+  "TUE · March/jog in place + shoulder circles | 2 min",
+  "TUE · Band external rotation, elbows at sides | 2×10/arm",
+  "TUE · Band internal rotation, elbows at sides | 2×10/arm",
+  "TUE · Band rows, elbows close to body | 2×12",
+  "TUE · Band pull-aparts at chest height | 2×10",
+  "TUE · Front plank | 2×20 sec",
+  // WEDNESDAY — Scapular Stability + Core
+  "WED · Easy movement + arm circles | 2 min",
+  "WED · Wall slides (pain-free range) | 2×10",
+  "WED · Wall push-ups (slow) | 2×10",
+  "WED · Band rows | 2×10",
+  "WED · Bird-dogs, each side | 2×8",
+  "WED · Side plank, each side | 2×15 sec",
+  // THURSDAY — Forearm + Shoulder Control
+  "THU · Easy warm-up + arm circles | 2 min",
+  "THU · Band external rotations | 2×10/arm",
+  "THU · Band internal rotations | 2×10/arm",
+  "THU · Wrist extension against very light band | 1×12/arm",
+  "THU · Forearm palm-up / palm-down rotations (no weight) | 2×10/arm",
+  "THU · Wall slides | 1×10",
+  "THU · Dead bugs, each side | 2×8",
+  // FRIDAY — Light Pre-Game Activation (no burnout or max-effort)
+  "FRI · Easy march / walk + shoulder circles | 3 min",
+  "FRI · Band rows | 1×10",
+  "FRI · Band external rotation | 1×10/arm",
+  "FRI · Band pull-aparts | 1×10",
+  "FRI · Wall slides | 1×8",
+  "FRI · Bird-dogs, each side | 1×8",
+  "FRI · Easy breathing + mobility | 2 min",
 ];
 
 function today() {
