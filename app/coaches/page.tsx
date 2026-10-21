@@ -13,14 +13,12 @@ import HomeworkEditor from "@/components/HomeworkEditor";
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
 const PracticeStats = dynamic(() => import("@/app/practice/page"), { ssr: false, loading: () => <LogoLoader /> });
-const Footage = dynamic(() => import("@/app/footage/page"), { ssr: false, loading: () => <LogoLoader /> });
 
 const TABS = [
   { id: "roster", label: "Roster Profiles" },
   { id: "reports", label: "Game Reports" },
   { id: "plan", label: "Practice Plan" },
   { id: "stats", label: "Practice Stats" },
-  { id: "footage", label: "Coaching Footage" },
   { id: "homework", label: "Homework" },
 ] as const;
 
@@ -337,7 +335,6 @@ function CoachesInner() {
       {tab === "reports" && <GameReports />}
       {tab === "plan" && <PracticePlan />}
       {tab === "stats" && <PracticeStats />}
-      {tab === "footage" && <Footage />}
       {tab === "homework" && <HomeworkEditor />}
     </div>
   );
