@@ -24,6 +24,8 @@ var PITCH_LOG_SHEET = "PitchLog";
 var MERCH_ORDERS_SHEET = "MerchOrders";
 var HOMEWORK_SHEET = "Homework";
 var HOMEWORK_COMPLETIONS_SHEET = "HomeworkCompletions";
+var ASSIGNMENT_TEMPLATES_SHEET = "AssignmentTemplates";
+var ASSIGNMENTS_SHEET = "Assignments";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -367,6 +369,24 @@ function doGet(e) {
     result = rowsToObjects_(getSheet_(MUMS_COLORS_SHEET, ["Id","FundraiserId","Player","Red","White","Yellow","Bronze","Purple","TriColor","TotalMums","AmountDue","SubmittedBy","CreatedAt"]).getDataRange().getValues());
   } else if (action === "homeworkCompletions") {
     result = rowsToObjects_(getSheet_(HOMEWORK_COMPLETIONS_SHEET, ["Id","Player","WeekOf","CompletedAt"]).getDataRange().getValues());
+  } else if (action === "assignmentTemplates") {
+    var atGetSheet = getSheet_(ASSIGNMENT_TEMPLATES_SHEET, ["Id", "Name", "Tasks", "CreatedAt"]);
+    backfillIds_(atGetSheet);
+    var atRaw = rowsToObjects_(atGetSheet.getDataRange().getValues());
+    result = atRaw.map(function(r) {
+      return { Id: r.Id, Name: r.Name, Tasks: JSON.parse(r.Tasks || "[]"), CreatedAt: r.CreatedAt };
+    });
+  } else if (action === "assignments") {
+    var aGetSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    backfillIds_(aGetSheet);
+    var allAssignments = rowsToObjects_(aGetSheet.getDataRange().getValues());
+    if (e.parameter.player) {
+      var apFilter = e.parameter.player.trim().toLowerCase();
+      allAssignments = allAssignments.filter(function(r) {
+        return String(r.PlayerName).trim().toLowerCase() === apFilter;
+      });
+    }
+    result = allAssignments;
   } else if (action === "homework") {
     var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
     var hwData = hwSheet.getDataRange().getValues();
@@ -1018,6 +1038,63 @@ function doPost(e) {
       CompletedAt: new Date().toISOString(),
     });
     result = { ok: true };
+  } else if (body.action === "saveAssignmentTemplate") {
+    var atSheet = getSheet_(ASSIGNMENT_TEMPLATES_SHEET, ["Id", "Name", "Tasks", "CreatedAt"]);
+    backfillIds_(atSheet);
+    if (body.id) {
+      var atRow = findRowById_(atSheet, body.id);
+      if (atRow === -1) { result = { error: "template not found" }; }
+      else {
+        var atUp = {};
+        if (body.name !== undefined) atUp.Name = body.name;
+        if (body.tasks !== undefined) atUp.Tasks = JSON.stringify(body.tasks);
+        setRowByHeaders_(atSheet, atRow, atUp);
+        result = { ok: true };
+      }
+    } else {
+      var newAtId = newId_();
+      appendRowByHeaders_(atSheet, {
+        Id: newAtId,
+        Name: body.name || "",
+        Tasks: JSON.stringify(body.tasks || []),
+        CreatedAt: new Date().toISOString(),
+      });
+      result = { ok: true, id: newAtId };
+    }
+  } else if (body.action === "deleteAssignmentTemplate") {
+    var datSheet = getSheet_(ASSIGNMENT_TEMPLATES_SHEET, ["Id", "Name", "Tasks", "CreatedAt"]);
+    var datRow = findRowById_(datSheet, body.id);
+    if (datRow === -1) { result = { error: "template not found" }; }
+    else { datSheet.deleteRow(datRow); result = { ok: true }; }
+  } else if (body.action === "createAssignment") {
+    var aSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    backfillIds_(aSheet);
+    var newAId = newId_();
+    appendRowByHeaders_(aSheet, {
+      Id: newAId,
+      TemplateId: body.templateId || "",
+      PlayerName: body.playerName || "",
+      StartDate: body.startDate || "",
+      EndDate: body.endDate || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true, id: newAId };
+  } else if (body.action === "updateAssignment") {
+    var uaSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    var uaRow = findRowById_(uaSheet, body.id);
+    if (uaRow === -1) { result = { error: "assignment not found" }; }
+    else {
+      var uaUp = {};
+      if (body.startDate !== undefined) uaUp.StartDate = body.startDate;
+      if (body.endDate !== undefined) uaUp.EndDate = body.endDate;
+      setRowByHeaders_(uaSheet, uaRow, uaUp);
+      result = { ok: true };
+    }
+  } else if (body.action === "deleteAssignment") {
+    var daSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    var daRow = findRowById_(daSheet, body.id);
+    if (daRow === -1) { result = { error: "assignment not found" }; }
+    else { daSheet.deleteRow(daRow); result = { ok: true }; }
   } else if (body.action === "logFundraiserSale") {
     var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
     backfillIds_(fsSheet);

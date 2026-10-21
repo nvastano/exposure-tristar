@@ -13,6 +13,7 @@ import PlayerDailyWork from "@/components/PlayerDailyWork";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 import PlayerPhoto from "@/components/PlayerPhoto";
+import AssignedWorkPlayer from "@/components/AssignedWorkPlayer";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type PlayerProfile = {
@@ -379,6 +380,8 @@ function PlayerContent() {
           </>
         )}
       </div>
+
+      <AssignedWorkPlayer playerName={playerName} />
 
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-bold tracking-wide">Daily Work</h2>

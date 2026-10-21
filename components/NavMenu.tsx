@@ -17,7 +17,7 @@ const COACH_LINKS = [
   { href: "/coaches?tab=roster", label: "Roster Profiles" },
   { href: "/coaches?tab=plan", label: "Practice Plan" },
   { href: "/coaches?tab=stats", label: "Practice Stats" },
-  { href: "/coaches?tab=homework", label: "Homework" },
+  { href: "/coaches?tab=assigned", label: "Assigned Work" },
   { href: "/monthly-report", label: "Monthly Report" },
 ];
 

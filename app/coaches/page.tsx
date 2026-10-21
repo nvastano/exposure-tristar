@@ -7,7 +7,7 @@ import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 import { sheetsGet } from "@/lib/sheets";
-import HomeworkEditor from "@/components/HomeworkEditor";
+import AssignedWorkCoach from "@/components/AssignedWorkCoach";
 
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
@@ -17,7 +17,7 @@ const TABS = [
   { id: "roster", label: "Roster Profiles" },
   { id: "plan", label: "Practice Plan" },
   { id: "stats", label: "Practice Stats" },
-  { id: "homework", label: "Homework" },
+  { id: "assigned", label: "Assigned Work" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -332,7 +332,7 @@ function CoachesInner() {
       {tab === "roster" && <RosterProfiles />}
       {tab === "plan" && <PracticePlan />}
       {tab === "stats" && <PracticeStats />}
-      {tab === "homework" && <HomeworkEditor />}
+      {tab === "assigned" && <AssignedWorkCoach />}
     </div>
   );
 }
