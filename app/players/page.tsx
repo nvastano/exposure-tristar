@@ -79,9 +79,14 @@ function daysUntilBirthday(dob: string): number | null {
   return Math.round((next.getTime() - today.getTime()) / 86400000);
 }
 
+type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string };
+
+function today() { return new Date().toISOString().slice(0, 10); }
+
 function PlayerRoster() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [profiles, setProfiles] = useState<PlayerProfile[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const { unlocked } = useCoachUnlocked();
 
@@ -89,9 +94,11 @@ function PlayerRoster() {
     Promise.all([
       sheetsGet("players") as Promise<PlayerRow[]>,
       sheetsGet("playerProfiles").catch(() => []) as Promise<PlayerProfile[]>,
-    ]).then(([p, pr]) => {
+      (sheetsGet("assignments") as Promise<Assignment[]>).catch(() => [] as Assignment[]),
+    ]).then(([p, pr, a]) => {
       setPlayers(p);
       setProfiles(pr);
+      setAssignments(Array.isArray(a) ? a : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -102,6 +109,13 @@ function PlayerRoster() {
     const nb = parseInt(b.Number || "999", 10);
     return na - nb;
   });
+
+  const now = today();
+  const assignedPlayers = new Set(
+    assignments
+      .filter(a => a.StartDate <= now && (!a.EndDate || a.EndDate >= now))
+      .map(a => a.PlayerName.trim().toLowerCase())
+  );
 
   const upcomingBirthdays = profiles
     .map((pr) => ({ name: pr.Player, days: daysUntilBirthday(pr.DOB), dob: pr.DOB }))
@@ -136,12 +150,18 @@ function PlayerRoster() {
           const days = profile ? daysUntilBirthday(profile.DOB) : null;
           const isBirthday = days === 0;
           const isSoon = days !== null && days <= 14;
+          const hasAssignment = assignedPlayers.has(p.Name.trim().toLowerCase());
           return (
             <Link
               key={p.Id}
               href={`/players?name=${encodeURIComponent(p.Name)}`}
-              className="flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/3 p-4 hover:border-accent/50 hover:bg-white/5 transition-colors"
+              className="relative flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/3 p-4 hover:border-accent/50 hover:bg-white/5 transition-colors"
             >
+              {hasAssignment && (
+                <span className="absolute top-2 right-2 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-tight">
+                  WORK
+                </span>
+              )}
               <PlayerPhoto name={p.Name} size={64} />
               <div className="text-center">
                 {p.Number && (
