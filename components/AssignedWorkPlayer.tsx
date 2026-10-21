@@ -12,6 +12,18 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toISO(dateStr: string): string {
+  if (!dateStr) return "";
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  // Sheets may return M/D/YYYY
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch {}
+  return dateStr;
+}
+
 function storageKey(assignmentId: string, playerName: string) {
   return `aw_${assignmentId}_${playerName.trim().toLowerCase()}`;
 }
@@ -158,11 +170,15 @@ export default function AssignedWorkPlayer({ playerName }: Props) {
   // Active assignments for this player
   const activeAssignments = useMemo(() => {
     const now = today();
-    return assignments.filter(a =>
-      a.PlayerName.trim().toLowerCase() === playerName.trim().toLowerCase() &&
-      a.StartDate <= now &&
-      (!a.EndDate || a.EndDate >= now)
-    );
+    return assignments.filter(a => {
+      const start = toISO(a.StartDate);
+      const end = toISO(a.EndDate);
+      return (
+        a.PlayerName.trim().toLowerCase() === playerName.trim().toLowerCase() &&
+        start <= now &&
+        (!end || end >= now)
+      );
+    });
   }, [assignments, playerName]);
 
   // Tasks already logged to Metrics per assignment

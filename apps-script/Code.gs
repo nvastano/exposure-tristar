@@ -1069,6 +1069,13 @@ function doPost(e) {
   } else if (body.action === "createAssignment") {
     var aSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
     backfillIds_(aSheet);
+    // Force date columns to plain text so Sheets doesn't auto-convert them
+    ensureColumn_(aSheet, "StartDate");
+    ensureColumn_(aSheet, "EndDate");
+    var startDateCol = ensureColumn_(aSheet, "StartDate");
+    var endDateCol = ensureColumn_(aSheet, "EndDate");
+    aSheet.getRange(1, startDateCol).setNumberFormat("@");
+    aSheet.getRange(1, endDateCol).setNumberFormat("@");
     var newAId = newId_();
     appendRowByHeaders_(aSheet, {
       Id: newAId,

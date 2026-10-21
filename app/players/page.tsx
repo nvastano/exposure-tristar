@@ -111,9 +111,15 @@ function PlayerRoster() {
   });
 
   const now = todayStr();
+  function toISO(s: string) {
+    if (!s) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    try { const d = new Date(s); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch {}
+    return s;
+  }
   const assignedPlayers = new Set(
     assignments
-      .filter(a => a.StartDate <= now && (!a.EndDate || a.EndDate >= now))
+      .filter(a => { const st = toISO(a.StartDate); const en = toISO(a.EndDate); return st <= now && (!en || en >= now); })
       .map(a => a.PlayerName.trim().toLowerCase())
   );
 
