@@ -286,8 +286,6 @@ function PlayerContent() {
 
   return (
     <div className="flex flex-col gap-8">
-      <AssignedWorkPlayer playerName={playerName} />
-
       <div>
         <Link href="/players" className="text-white/40 hover:text-accent text-sm mb-3 inline-block">
           ← All Players
@@ -350,6 +348,8 @@ function PlayerContent() {
           )}
         </div>
       </div>
+
+      <AssignedWorkPlayer playerName={playerName} />
 
       {unlocked && showProfile && (
         <div className="flex flex-col gap-4">
