@@ -525,10 +525,20 @@ function SessionRow({
   );
 }
 
+function PlayerPageInner() {
+  const searchParams = useSearchParams();
+  const name = searchParams.get("name") || "";
+  return (
+    <Suspense fallback={<LogoLoader />}>
+      <PlayerContent key={name} />
+    </Suspense>
+  );
+}
+
 export default function PlayerPage() {
   return (
     <Suspense fallback={<LogoLoader />}>
-      <PlayerContent />
+      <PlayerPageInner />
     </Suspense>
   );
 }
