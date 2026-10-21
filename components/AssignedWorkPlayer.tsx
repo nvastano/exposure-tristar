@@ -5,7 +5,7 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
 type Template = { Id: string; Name: string; Tasks: string[] };
-type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string };
+type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string };
 type MetricRow = { Player: string; Metric: string; Value: string; Date: string };
 
 function today() {
@@ -49,6 +49,7 @@ type AssignmentCardProps = {
   onTaskLogged: () => void;
 };
 
+
 function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTaskLogged }: AssignmentCardProps) {
   const [checked, setChecked] = useState<Set<string>>(() => loadChecked(assignment.Id, playerName));
 
@@ -89,12 +90,18 @@ function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTas
 
   return (
     <div className={`rounded-xl border p-5 flex flex-col gap-4 ${allDone ? "border-accent/30 bg-accent/5" : "border-white/10 bg-white/3"}`}>
+      {assignment.Notes && (
+        <div className="rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
+          <p className="text-xs font-bold tracking-widest uppercase text-accent/70 mb-1">From your coach</p>
+          <p className="text-sm text-white/80 leading-relaxed">{assignment.Notes}</p>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-base">{template.Name}</p>
           <p className="text-xs text-white/30 mt-0.5">
-            Started {assignment.StartDate}
-            {assignment.EndDate ? ` · ends ${assignment.EndDate}` : " · ongoing"}
+            Started {toISO(assignment.StartDate)}
+            {assignment.EndDate ? ` · ends ${toISO(assignment.EndDate)}` : " · ongoing"}
           </p>
         </div>
         <div className="text-right shrink-0">

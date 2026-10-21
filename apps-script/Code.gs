@@ -377,7 +377,7 @@ function doGet(e) {
       return { Id: r.Id, Name: r.Name, Tasks: JSON.parse(r.Tasks || "[]"), CreatedAt: r.CreatedAt };
     });
   } else if (action === "assignments") {
-    var aGetSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    var aGetSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "Notes", "CreatedAt"]);
     backfillIds_(aGetSheet);
     var allAssignments = rowsToObjects_(aGetSheet.getDataRange().getValues());
     if (e.parameter.player) {
@@ -1067,7 +1067,7 @@ function doPost(e) {
     if (datRow === -1) { result = { error: "template not found" }; }
     else { datSheet.deleteRow(datRow); result = { ok: true }; }
   } else if (body.action === "createAssignment") {
-    var aSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "CreatedAt"]);
+    var aSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "Notes", "CreatedAt"]);
     backfillIds_(aSheet);
     // Force date columns to plain text so Sheets doesn't auto-convert them
     ensureColumn_(aSheet, "StartDate");
@@ -1083,6 +1083,7 @@ function doPost(e) {
       PlayerName: body.playerName || "",
       StartDate: body.startDate || "",
       EndDate: body.endDate || "",
+      Notes: body.notes || "",
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true, id: newAId };

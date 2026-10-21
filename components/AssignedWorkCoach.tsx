@@ -5,7 +5,7 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
 type Template = { Id: string; Name: string; Tasks: string[]; CreatedAt: string };
-type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; CreatedAt: string };
+type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string; CreatedAt: string };
 type PlayerRow = { Id: string; Name: string };
 
 const ARM_CARE_TASKS = [
@@ -67,9 +67,10 @@ export default function AssignedWorkCoach() {
   // Assignment form state
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [assignTemplateId, setAssignTemplateId] = useState("");
-  const [assignPlayer, setAssignPlayer] = useState("");
+  const [assignPlayers, setAssignPlayers] = useState<Set<string>>(new Set());
   const [assignStart, setAssignStart] = useState(today());
   const [assignEnd, setAssignEnd] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
 
   async function load() {
@@ -126,19 +127,23 @@ export default function AssignedWorkCoach() {
   }
 
   async function saveAssignment() {
-    if (!assignTemplateId || !assignPlayer || !assignStart) return;
+    if (!assignTemplateId || assignPlayers.size === 0 || !assignStart) return;
     setSavingAssignment(true);
-    await sheetsPost("createAssignment", {
-      templateId: assignTemplateId,
-      playerName: assignPlayer,
-      startDate: assignStart,
-      endDate: assignEnd,
-    });
+    await Promise.all([...assignPlayers].map(p =>
+      sheetsPost("createAssignment", {
+        templateId: assignTemplateId,
+        playerName: p,
+        startDate: assignStart,
+        endDate: assignEnd,
+        notes: assignNotes,
+      })
+    ));
     setShowAssignForm(false);
     setAssignTemplateId("");
-    setAssignPlayer("");
+    setAssignPlayers(new Set());
     setAssignStart(today());
     setAssignEnd("");
+    setAssignNotes("");
     setSavingAssignment(false);
     await load();
   }
@@ -282,16 +287,44 @@ export default function AssignedWorkCoach() {
                   {templates.map(t => <option key={t.Id} value={t.Id}>{t.Name}</option>)}
                 </select>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-white/30">Player</label>
-                <select
-                  value={assignPlayer}
-                  onChange={e => setAssignPlayer(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60"
-                >
-                  <option value="">Select player…</option>
-                  {players.map(p => <option key={p.Id} value={p.Name}>{p.Name}</option>)}
-                </select>
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-white/30">Players</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setAssignPlayers(new Set(players.map(p => p.Name)))}
+                      className="text-xs text-accent hover:underline"
+                    >All</button>
+                    <button
+                      type="button"
+                      onClick={() => setAssignPlayers(new Set())}
+                      className="text-xs text-white/40 hover:text-white hover:underline"
+                    >None</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {players.map(p => {
+                    const on = assignPlayers.has(p.Name);
+                    return (
+                      <button
+                        key={p.Id}
+                        type="button"
+                        onClick={() => {
+                          const next = new Set(assignPlayers);
+                          on ? next.delete(p.Name) : next.add(p.Name);
+                          setAssignPlayers(next);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-colors ${on ? "border-accent/40 bg-accent/10 text-white" : "border-white/10 text-white/40 hover:text-white/70"}`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded-sm border flex-shrink-0 flex items-center justify-center text-[10px] ${on ? "border-accent bg-accent text-white" : "border-white/20"}`}>
+                          {on ? "✓" : ""}
+                        </span>
+                        {p.Name}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-white/30">Start Date</label>
@@ -304,8 +337,19 @@ export default function AssignedWorkCoach() {
                   className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60" />
               </div>
             </div>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-xs text-white/30">Instructions for player (optional)</label>
+              <textarea
+                value={assignNotes}
+                onChange={e => setAssignNotes(e.target.value)}
+                placeholder="e.g. Focus on slow, controlled reps. Stop if you feel any elbow pain."
+                rows={3}
+                className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 resize-none"
+              />
+            </div>
+
             {assignTemplateId && (
-              <div className="rounded-lg border border-white/5 bg-white/2 p-3">
+              <div className="rounded-lg border border-white/5 bg-white/2 p-3 sm:col-span-2">
                 <p className="text-xs text-white/30 mb-2">Tasks in this template:</p>
                 <ul className="flex flex-col gap-1">
                   {(templateMap.get(assignTemplateId)?.Tasks || []).map((task, i) => (
@@ -319,10 +363,10 @@ export default function AssignedWorkCoach() {
             <div className="flex gap-2">
               <button
                 onClick={saveAssignment}
-                disabled={savingAssignment || !assignTemplateId || !assignPlayer || !assignStart}
+                disabled={savingAssignment || !assignTemplateId || assignPlayers.size === 0 || !assignStart}
                 className="bg-accent hover:bg-accent/80 text-white text-sm font-bold px-4 py-2 rounded transition-colors disabled:opacity-40"
               >
-                {savingAssignment ? "Saving…" : "Create Assignment"}
+                {savingAssignment ? "Saving…" : `Assign to ${assignPlayers.size} player${assignPlayers.size !== 1 ? "s" : ""}`}
               </button>
               <button onClick={() => setShowAssignForm(false)} className="text-sm text-white/40 hover:text-white px-4 py-2 rounded border border-white/10 transition-colors">Cancel</button>
             </div>
@@ -349,6 +393,7 @@ export default function AssignedWorkCoach() {
                     {a.StartDate}{a.EndDate ? ` → ${a.EndDate}` : " (ongoing)"}
                     {tmpl && ` · ${tmpl.Tasks.length} tasks`}
                   </p>
+                  {a.Notes && <p className="text-xs text-white/40 italic mt-1">"{a.Notes}"</p>}
                 </div>
                 <button onClick={() => deleteAssignment(a.Id)} className="text-xs text-white/30 hover:text-accent underline shrink-0">Remove</button>
               </div>
