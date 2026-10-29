@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
-type Template = { Id: string; Name: string; Tasks: string[]; CreatedAt: string };
+type Task = { text: string; videoUrl?: string };
+type Template = { Id: string; Name: string; Tasks: Task[]; CreatedAt: string };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string; CreatedAt: string };
 type PlayerRow = { Id: string; Name: string };
 
@@ -72,7 +73,7 @@ export default function AssignedWorkCoach() {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [templateName, setTemplateName] = useState("");
-  const [templateTasks, setTemplateTasks] = useState<string[]>([""]);
+  const [templateTasks, setTemplateTasks] = useState<Task[]>([{ text: "" }]);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Assignment form state
@@ -99,26 +100,26 @@ export default function AssignedWorkCoach() {
   useEffect(() => { load(); }, []);
 
   async function seedArmCare() {
-    await sheetsPost("saveAssignmentTemplate", { name: "Arm Care", tasks: ARM_CARE_TASKS });
+    await sheetsPost("saveAssignmentTemplate", { name: "Arm Care", tasks: ARM_CARE_TASKS.map(t => ({ text: t })) });
     await load();
   }
 
   function openNewTemplate() {
     setEditingTemplate(null);
     setTemplateName("");
-    setTemplateTasks([""]);
+    setTemplateTasks([{ text: "" }]);
     setShowTemplateEditor(true);
   }
 
   function openEditTemplate(t: Template) {
     setEditingTemplate(t);
     setTemplateName(t.Name);
-    setTemplateTasks([...t.Tasks, ""]);
+    setTemplateTasks([...t.Tasks, { text: "" }]);
     setShowTemplateEditor(true);
   }
 
   async function saveTemplate() {
-    const tasks = templateTasks.map(s => s.trim()).filter(Boolean);
+    const tasks = templateTasks.map(t => ({ ...t, text: t.text.trim() })).filter(t => t.text);
     if (!templateName.trim() || tasks.length === 0) return;
     setSavingTemplate(true);
     if (editingTemplate) {
@@ -128,7 +129,7 @@ export default function AssignedWorkCoach() {
     }
     setEditingTemplate(null);
     setTemplateName("");
-    setTemplateTasks([""]);
+    setTemplateTasks([{ text: "" }]);
     setShowTemplateEditor(false);
     setSavingTemplate(false);
     await load();
@@ -215,25 +216,39 @@ export default function AssignedWorkCoach() {
             <div className="flex flex-col gap-2">
               <p className="text-xs text-white/30">Tasks</p>
               {templateTasks.map((task, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={task}
-                    onChange={e => {
-                      const next = [...templateTasks];
-                      next[i] = e.target.value;
-                      // auto-add blank row at end
-                      if (i === templateTasks.length - 1 && e.target.value) next.push("");
-                      setTemplateTasks(next);
-                    }}
-                    placeholder={`Task ${i + 1}`}
-                    className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
-                  />
-                  {templateTasks.length > 1 && (
-                    <button
-                      onClick={() => setTemplateTasks(templateTasks.filter((_, j) => j !== i))}
-                      className="text-white/20 hover:text-accent px-2 text-lg leading-none"
-                    >×</button>
+                <div key={i} className="flex flex-col gap-1.5 border border-white/5 rounded-lg p-2.5 bg-white/2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={task.text}
+                      onChange={e => {
+                        const next = [...templateTasks];
+                        next[i] = { ...next[i], text: e.target.value };
+                        if (i === templateTasks.length - 1 && e.target.value) next.push({ text: "" });
+                        setTemplateTasks(next);
+                      }}
+                      placeholder={`Task ${i + 1}`}
+                      className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+                    />
+                    {templateTasks.length > 1 && (
+                      <button
+                        onClick={() => setTemplateTasks(templateTasks.filter((_, j) => j !== i))}
+                        className="text-white/20 hover:text-accent px-2 text-lg leading-none"
+                      >×</button>
+                    )}
+                  </div>
+                  {task.text.trim() && (
+                    <input
+                      type="url"
+                      value={task.videoUrl || ""}
+                      onChange={e => {
+                        const next = [...templateTasks];
+                        next[i] = { ...next[i], videoUrl: e.target.value };
+                        setTemplateTasks(next);
+                      }}
+                      placeholder="Video link (optional)"
+                      className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-accent/40"
+                    />
                   )}
                 </div>
               ))}
@@ -247,7 +262,7 @@ export default function AssignedWorkCoach() {
                 {savingTemplate ? "Saving…" : "Save Template"}
               </button>
               <button
-                onClick={() => { setEditingTemplate(null); setTemplateName(""); setTemplateTasks([""]); setShowTemplateEditor(false); }}
+                onClick={() => { setEditingTemplate(null); setTemplateName(""); setTemplateTasks([{ text: "" }]); setShowTemplateEditor(false); }}
                 className="text-sm text-white/40 hover:text-white px-4 py-2 rounded border border-white/10 transition-colors"
               >Cancel</button>
             </div>
@@ -367,8 +382,10 @@ export default function AssignedWorkCoach() {
                 <p className="text-xs text-white/30 mb-2">Tasks in this template:</p>
                 <ul className="flex flex-col gap-1">
                   {(templateMap.get(assignTemplateId)?.Tasks || []).map((task, i) => (
-                    <li key={i} className="text-sm text-white/70 flex gap-2">
-                      <span className="text-white/20">{i + 1}.</span>{task}
+                    <li key={i} className="text-sm text-white/70 flex gap-2 items-center">
+                      <span className="text-white/20">{i + 1}.</span>
+                      <span>{task.text}</span>
+                      {task.videoUrl && <span className="text-xs text-accent/70">▶ video</span>}
                     </li>
                   ))}
                 </ul>
