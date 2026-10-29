@@ -374,7 +374,11 @@ function doGet(e) {
     backfillIds_(atGetSheet);
     var atRaw = rowsToObjects_(atGetSheet.getDataRange().getValues());
     result = atRaw.map(function(r) {
-      return { Id: r.Id, Name: r.Name, Tasks: JSON.parse(r.Tasks || "[]"), CreatedAt: r.CreatedAt };
+      var rawTasks = JSON.parse(r.Tasks || "[]");
+      var tasks = rawTasks.map(function(t) {
+        return (typeof t === "string") ? { text: t } : t;
+      });
+      return { Id: r.Id, Name: r.Name, Tasks: tasks, CreatedAt: r.CreatedAt };
     });
   } else if (action === "assignments") {
     var aGetSheet = getSheet_(ASSIGNMENTS_SHEET, ["Id", "TemplateId", "PlayerName", "StartDate", "EndDate", "Notes", "CreatedAt"]);

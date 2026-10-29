@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
-type Template = { Id: string; Name: string; Tasks: string[] };
+type Task = { text: string; videoUrl?: string };
+type Template = { Id: string; Name: string; Tasks: Task[] };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string };
 type MetricRow = { Player: string; Metric: string; Value: string; Date: string };
 
@@ -124,23 +125,35 @@ function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTas
         {template.Tasks.map((task, i) => {
           const taskId = String(i);
           const done = checked.has(taskId);
+          const taskText = typeof task === "string" ? task : task.text;
+          const videoUrl = typeof task === "string" ? undefined : task.videoUrl;
           return (
-            <button
-              key={taskId}
-              onClick={() => toggle(taskId)}
-              className={`flex items-start gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                done
-                  ? "border-accent/20 bg-accent/8 text-white/60"
-                  : "border-white/5 hover:border-white/15 text-white"
-              }`}
-            >
-              <span className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] transition-colors ${
-                done ? "border-accent bg-accent text-white" : "border-white/20"
-              }`}>
-                {done ? "✓" : ""}
-              </span>
-              <span className={`text-sm ${done ? "line-through opacity-50" : ""}`}>{task}</span>
-            </button>
+            <div key={taskId} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
+              done ? "border-accent/20 bg-accent/8" : "border-white/5"
+            }`}>
+              <button
+                onClick={() => toggle(taskId)}
+                className="flex items-start gap-3 flex-1 text-left"
+              >
+                <span className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] transition-colors ${
+                  done ? "border-accent bg-accent text-white" : "border-white/20"
+                }`}>
+                  {done ? "✓" : ""}
+                </span>
+                <span className={`text-sm ${done ? "line-through opacity-50 text-white/60" : "text-white"}`}>{taskText}</span>
+              </button>
+              {videoUrl && (
+                <a
+                  href={videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-xs font-semibold text-accent hover:text-accent/70 transition-colors mt-0.5"
+                  onClick={e => e.stopPropagation()}
+                >
+                  ▶ Watch
+                </a>
+              )}
+            </div>
           );
         })}
       </div>
