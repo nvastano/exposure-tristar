@@ -52,6 +52,16 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toISO(dateStr: string): string {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch {}
+  return dateStr;
+}
+
 export default function AssignedWorkCoach() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -59,6 +69,7 @@ export default function AssignedWorkCoach() {
   const [loading, setLoading] = useState(true);
 
   // Template editor state
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [templateTasks, setTemplateTasks] = useState<string[]>([""]);
@@ -96,12 +107,14 @@ export default function AssignedWorkCoach() {
     setEditingTemplate(null);
     setTemplateName("");
     setTemplateTasks([""]);
+    setShowTemplateEditor(true);
   }
 
   function openEditTemplate(t: Template) {
     setEditingTemplate(t);
     setTemplateName(t.Name);
     setTemplateTasks([...t.Tasks, ""]);
+    setShowTemplateEditor(true);
   }
 
   async function saveTemplate() {
@@ -116,6 +129,7 @@ export default function AssignedWorkCoach() {
     setEditingTemplate(null);
     setTemplateName("");
     setTemplateTasks([""]);
+    setShowTemplateEditor(false);
     setSavingTemplate(false);
     await load();
   }
@@ -158,7 +172,7 @@ export default function AssignedWorkCoach() {
 
   const templateMap = new Map(templates.map(t => [t.Id, t]));
 
-  const isEditing = templateName !== "" || editingTemplate !== null;
+  const isEditing = showTemplateEditor;
 
   return (
     <div className="flex flex-col gap-8">
@@ -233,7 +247,7 @@ export default function AssignedWorkCoach() {
                 {savingTemplate ? "Saving…" : "Save Template"}
               </button>
               <button
-                onClick={() => { setEditingTemplate(null); setTemplateName(""); setTemplateTasks([""]); }}
+                onClick={() => { setEditingTemplate(null); setTemplateName(""); setTemplateTasks([""]); setShowTemplateEditor(false); }}
                 className="text-sm text-white/40 hover:text-white px-4 py-2 rounded border border-white/10 transition-colors"
               >Cancel</button>
             </div>
@@ -379,7 +393,7 @@ export default function AssignedWorkCoach() {
           )}
           {assignments.map(a => {
             const tmpl = templateMap.get(a.TemplateId);
-            const isActive = !a.EndDate || a.EndDate >= today();
+            const isActive = !a.EndDate || toISO(a.EndDate) >= today();
             return (
               <div key={a.Id} className={`rounded-lg border p-4 flex items-start justify-between gap-4 ${isActive ? "border-white/10 bg-white/3" : "border-white/5 bg-white/1 opacity-50"}`}>
                 <div>
@@ -390,7 +404,7 @@ export default function AssignedWorkCoach() {
                     {!isActive && <span className="text-xs text-white/30 italic">ended</span>}
                   </div>
                   <p className="text-xs text-white/30 mt-0.5">
-                    {a.StartDate}{a.EndDate ? ` → ${a.EndDate}` : " (ongoing)"}
+                    {toISO(a.StartDate)}{a.EndDate ? ` → ${toISO(a.EndDate)}` : " (ongoing)"}
                     {tmpl && ` · ${tmpl.Tasks.length} tasks`}
                   </p>
                   {a.Notes && <p className="text-xs text-white/40 italic mt-1">"{a.Notes}"</p>}
