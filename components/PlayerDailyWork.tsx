@@ -57,9 +57,11 @@ export default function PlayerDailyWork({
 }) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
+  const displayMetrics = useMemo(() => metrics.filter(m => m.Metric !== "AssignedTask"), [metrics]);
+
   const byDate = useMemo(() => {
     const map = new Map<string, RawMetricRow[]>();
-    for (const m of metrics) {
+    for (const m of displayMetrics) {
       const d = formatDate(m.Date);
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(m);
@@ -73,7 +75,7 @@ export default function PlayerDailyWork({
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const m of metrics) {
+    for (const m of displayMetrics) {
       const cat = m.Metric === "Drill" ? "Drills" : m.Metric === "Other" ? "Other" : metricDef(m.Metric)?.category ?? "Other";
       counts[cat] = (counts[cat] ?? 0) + 1;
     }
@@ -82,7 +84,7 @@ export default function PlayerDailyWork({
 
   const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-  if (metrics.length === 0) {
+  if (displayMetrics.length === 0) {
     return <p className="text-white/50 text-sm">No daily work logged yet.</p>;
   }
 
