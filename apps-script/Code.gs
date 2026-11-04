@@ -513,9 +513,10 @@ function doPost(e) {
       ensurePlayer_(m.player);
       appendMetric_(mSheet, m);
     });
-    if (body.entries.length) {
+    var notifyEntries = body.entries.filter(function(m) { return m.metric !== "AssignedTask"; });
+    if (notifyEntries.length) {
       notifyGroupMe_(
-        body.entries[0].player +
+        notifyEntries[0].player +
           " just logged their Daily Work 💪\nLog yours too here: http://bit.ly/3SK1EK6"
       );
     }
