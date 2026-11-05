@@ -117,7 +117,7 @@ export default function DailyDigest({
                   </span>
                 </Link>
                 <ul className="flex flex-col gap-1 text-sm text-white/70">
-                  {entries.map((m) => {
+                  {entries.filter(m => m.Metric !== "AssignedTask").map((m) => {
                     const def = metricDef(m.Metric);
                     const label = def?.label || m.Metric;
                     const isBoolean = def?.type === "boolean";
@@ -129,6 +129,16 @@ export default function DailyDigest({
                       </li>
                     );
                   })}
+                  {(() => {
+                    const assignedCount = entries.filter(m => m.Metric === "AssignedTask").length;
+                    if (!assignedCount) return null;
+                    return (
+                      <li className="flex justify-between gap-2">
+                        <span className="shrink-0">Assigned Work</span>
+                        <span className="text-green-400">{assignedCount} task{assignedCount !== 1 ? "s" : ""} ✓</span>
+                      </li>
+                    );
+                  })()}
                 </ul>
                 {(() => {
                   const trivia = triviaByPlayer.get(player.Name);
