@@ -81,9 +81,16 @@ export default function AssignedWorkCoach() {
   const [assignTemplateId, setAssignTemplateId] = useState("");
   const [assignPlayers, setAssignPlayers] = useState<Set<string>>(new Set());
   const [assignStart, setAssignStart] = useState(today());
+  const [assignExpires, setAssignExpires] = useState(false);
   const [assignEnd, setAssignEnd] = useState("");
   const [assignNotes, setAssignNotes] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
+
+  // Inline edit state for existing assignments
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [editExpires, setEditExpires] = useState(false);
+  const [editEnd, setEditEnd] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function load() {
     const [t, a, p] = await Promise.all([
@@ -167,6 +174,21 @@ export default function AssignedWorkCoach() {
     if (!confirm("Remove this assignment?")) return;
     await sheetsPost("deleteAssignment", { id });
     await load();
+  }
+
+  async function updateAssignment(id: string, endDate: string) {
+    setSavingEdit(true);
+    await sheetsPost("updateAssignment", { id, endDate });
+    setEditingAssignmentId(null);
+    setSavingEdit(false);
+    await load();
+  }
+
+  function openEditAssignment(a: Assignment) {
+    const hasEnd = !!a.EndDate && toISO(a.EndDate) !== "";
+    setEditExpires(hasEnd);
+    setEditEnd(hasEnd ? toISO(a.EndDate) : "");
+    setEditingAssignmentId(a.Id);
   }
 
   if (loading) return <LogoLoader />;
@@ -360,10 +382,24 @@ export default function AssignedWorkCoach() {
                 <input type="date" value={assignStart} onChange={e => setAssignStart(e.target.value)}
                   className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-white/30">End Date (optional)</label>
-                <input type="date" value={assignEnd} onChange={e => setAssignEnd(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60" />
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-white/30">Expiration</label>
+                <div className="flex rounded overflow-hidden border border-white/10 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => { setAssignExpires(false); setAssignEnd(""); }}
+                    className={`flex-1 py-2 transition-colors ${!assignExpires ? "bg-accent text-white" : "bg-white/5 text-white/40 hover:text-white"}`}
+                  >Ongoing</button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignExpires(true)}
+                    className={`flex-1 py-2 transition-colors ${assignExpires ? "bg-accent text-white" : "bg-white/5 text-white/40 hover:text-white"}`}
+                  >Set end date</button>
+                </div>
+                {assignExpires && (
+                  <input type="date" value={assignEnd} onChange={e => setAssignEnd(e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60" />
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-1 sm:col-span-2">
@@ -412,21 +448,55 @@ export default function AssignedWorkCoach() {
             const tmpl = templateMap.get(a.TemplateId);
             const isActive = !a.EndDate || toISO(a.EndDate) >= today();
             return (
-              <div key={a.Id} className={`rounded-lg border p-4 flex items-start justify-between gap-4 ${isActive ? "border-white/10 bg-white/3" : "border-white/5 bg-white/1 opacity-50"}`}>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{a.PlayerName}</span>
-                    <span className="text-xs text-white/30">—</span>
-                    <span className="text-sm text-white/70">{tmpl?.Name || "Unknown template"}</span>
-                    {!isActive && <span className="text-xs text-white/30 italic">ended</span>}
+              <div key={a.Id} className={`rounded-lg border p-4 flex flex-col gap-2 ${isActive ? "border-white/10 bg-white/3" : "border-white/5 bg-white/1 opacity-50"}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{a.PlayerName}</span>
+                      <span className="text-xs text-white/30">—</span>
+                      <span className="text-sm text-white/70">{tmpl?.Name || "Unknown template"}</span>
+                      {!isActive && <span className="text-xs text-white/30 italic">ended</span>}
+                    </div>
+                    <p className="text-xs text-white/30 mt-0.5">
+                      {toISO(a.StartDate)}{a.EndDate ? ` → ${toISO(a.EndDate)}` : " (ongoing)"}
+                      {tmpl && ` · ${tmpl.Tasks.length} tasks`}
+                    </p>
+                    {a.Notes && <p className="text-xs text-white/40 italic mt-1">"{a.Notes}"</p>}
                   </div>
-                  <p className="text-xs text-white/30 mt-0.5">
-                    {toISO(a.StartDate)}{a.EndDate ? ` → ${toISO(a.EndDate)}` : " (ongoing)"}
-                    {tmpl && ` · ${tmpl.Tasks.length} tasks`}
-                  </p>
-                  {a.Notes && <p className="text-xs text-white/40 italic mt-1">"{a.Notes}"</p>}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <button onClick={() => openEditAssignment(a)} className="text-xs text-white/40 hover:text-white underline">Edit</button>
+                    <button onClick={() => deleteAssignment(a.Id)} className="text-xs text-white/30 hover:text-accent underline">Remove</button>
+                  </div>
                 </div>
-                <button onClick={() => deleteAssignment(a.Id)} className="text-xs text-white/30 hover:text-accent underline shrink-0">Remove</button>
+                {editingAssignmentId === a.Id && (
+                  <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
+                    <p className="text-xs text-white/40">Edit expiration</p>
+                    <div className="flex rounded overflow-hidden border border-white/10 text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => { setEditExpires(false); setEditEnd(""); }}
+                        className={`flex-1 py-1.5 transition-colors ${!editExpires ? "bg-accent text-white" : "bg-white/5 text-white/40 hover:text-white"}`}
+                      >Ongoing</button>
+                      <button
+                        type="button"
+                        onClick={() => setEditExpires(true)}
+                        className={`flex-1 py-1.5 transition-colors ${editExpires ? "bg-accent text-white" : "bg-white/5 text-white/40 hover:text-white"}`}
+                      >Set end date</button>
+                    </div>
+                    {editExpires && (
+                      <input type="date" value={editEnd} onChange={e => setEditEnd(e.target.value)}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/60" />
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => updateAssignment(a.Id, editExpires ? editEnd : "")}
+                        disabled={savingEdit || (editExpires && !editEnd)}
+                        className="bg-accent hover:bg-accent/80 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors disabled:opacity-40"
+                      >{savingEdit ? "Saving…" : "Save"}</button>
+                      <button onClick={() => setEditingAssignmentId(null)} className="text-xs text-white/40 hover:text-white px-3 py-1.5 rounded border border-white/10 transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
