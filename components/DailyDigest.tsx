@@ -9,6 +9,9 @@ import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
+type AssignmentTask = { text: string; videoUrl?: string };
+type AssignmentTemplate = { Id: string; Name: string; Tasks: AssignmentTask[] };
+type Assignment = { Id: string; TemplateId: string; PlayerName: string };
 // Returns the Monday of the week containing the given YYYY-MM-DD date, or "" on invalid input
 function weekStart(dateStr: string): string {
   if (!dateStr) return "";
@@ -24,11 +27,19 @@ export default function DailyDigest({
   players,
   metrics,
   triviaResponses = [],
+  templates = [],
+  assignments = [],
 }: {
   players: PlayerRow[];
   metrics: RawMetricRow[];
   triviaResponses?: TriviaResponseRow[];
+  templates?: AssignmentTemplate[];
+  assignments?: Assignment[];
 }) {
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
+  const templateMap = useMemo(() => new Map(templates.map(t => [t.Id, t])), [templates]);
+  const assignmentMap = useMemo(() => new Map(assignments.map(a => [a.Id, a])), [assignments]);
+
   const today = localDateStr();
 
   const dates = useMemo(() => {
@@ -130,14 +141,53 @@ export default function DailyDigest({
                     );
                   })}
                   {(() => {
-                    const assignedCount = entries.filter(m => m.Metric === "AssignedTask").length;
-                    if (!assignedCount) return null;
-                    return (
-                      <li className="flex justify-between gap-2">
-                        <span className="shrink-0">Assigned Work</span>
-                        <span className="text-green-400">{assignedCount} task{assignedCount !== 1 ? "s" : ""} ✓</span>
-                      </li>
-                    );
+                    const assignedEntries = entries.filter(m => m.Metric === "AssignedTask");
+                    if (!assignedEntries.length) return null;
+
+                    // Group by assignmentId
+                    const byAssignment = new Map<string, number[]>();
+                    for (const m of assignedEntries) {
+                      const [aId, taskIdx] = m.Value.split(":");
+                      if (!byAssignment.has(aId)) byAssignment.set(aId, []);
+                      byAssignment.get(aId)!.push(Number(taskIdx));
+                    }
+
+                    return Array.from(byAssignment.entries()).map(([aId, taskIndices]) => {
+                      const assignment = assignmentMap.get(aId);
+                      const template = assignment ? templateMap.get(assignment.TemplateId) : undefined;
+                      const name = template?.Name ?? "Assigned Work";
+                      const expandKey = `${player.Id}-${aId}`;
+                      const isExpanded = expandedAssignment === expandKey;
+
+                      return (
+                        <li key={aId} className="flex flex-col gap-1">
+                          <button
+                            onClick={() => setExpandedAssignment(isExpanded ? null : expandKey)}
+                            className="flex justify-between gap-2 w-full text-left hover:text-white transition-colors"
+                          >
+                            <span className="shrink-0">{name}</span>
+                            <span className="text-green-400 flex items-center gap-1">
+                              {taskIndices.length} task{taskIndices.length !== 1 ? "s" : ""} ✓
+                              <span className="text-white/30 text-[10px]">{isExpanded ? "▲" : "▼"}</span>
+                            </span>
+                          </button>
+                          {isExpanded && template && (
+                            <ul className="pl-3 flex flex-col gap-0.5 border-l border-white/10">
+                              {taskIndices.sort((a, b) => a - b).map(idx => {
+                                const task = template.Tasks[idx];
+                                const taskText = task ? (typeof task === "string" ? task : task.text) : `Task ${idx + 1}`;
+                                return (
+                                  <li key={idx} className="text-xs text-white/50 flex gap-1.5">
+                                    <span className="text-green-400/70">✓</span>
+                                    {taskText}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    });
                   })()}
                 </ul>
                 {(() => {
