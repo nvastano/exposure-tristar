@@ -9,7 +9,7 @@ import PlayerPhoto from "@/components/PlayerPhoto";
 
 type PlayerRow = { Id: string; Name: string; Number?: string };
 type TriviaResponseRow = { Player: string; QuestionId: string; Correct: string; Date: string };
-type AssignmentTask = { text: string; videoUrl?: string };
+type AssignmentTask = { text: string; videoUrl?: string; day?: string };
 type AssignmentTemplate = { Id: string; Name: string; Tasks: AssignmentTask[] };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string };
 // Returns the Monday of the week containing the given YYYY-MM-DD date, or "" on invalid input
@@ -177,8 +177,11 @@ export default function DailyDigest({
                                 const task = template.Tasks[idx];
                                 const taskText = task ? (typeof task === "string" ? task : task.text) : `Task ${idx + 1}`;
                                 return (
-                                  <li key={idx} className="text-xs text-white/50 flex gap-1.5">
+                                  <li key={idx} className="text-xs text-white/50 flex gap-1.5 items-center">
                                     <span className="text-green-400/70">✓</span>
+                                    {task && typeof task !== "string" && task.day && (
+                                      <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-white/5 text-white/30">{task.day}</span>
+                                    )}
                                     {taskText}
                                   </li>
                                 );

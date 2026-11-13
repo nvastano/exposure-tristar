@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
-type Task = { text: string; videoUrl?: string };
+type Task = { text: string; videoUrl?: string; day?: string };
 type Template = { Id: string; Name: string; Tasks: Task[]; CreatedAt: string };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string; CreatedAt: string };
 type PlayerRow = { Id: string; Name: string };
@@ -260,17 +260,45 @@ export default function AssignedWorkCoach() {
                     )}
                   </div>
                   {task.text.trim() && (
-                    <input
-                      type="url"
-                      value={task.videoUrl || ""}
-                      onChange={e => {
-                        const next = [...templateTasks];
-                        next[i] = { ...next[i], videoUrl: e.target.value };
-                        setTemplateTasks(next);
-                      }}
-                      placeholder="Video link (optional)"
-                      className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-accent/40"
-                    />
+                    <>
+                      <input
+                        type="url"
+                        value={task.videoUrl || ""}
+                        onChange={e => {
+                          const next = [...templateTasks];
+                          next[i] = { ...next[i], videoUrl: e.target.value };
+                          setTemplateTasks(next);
+                        }}
+                        placeholder="Video link (optional)"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-accent/40"
+                      />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-white/30 mr-0.5">Day:</span>
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              const next = [...templateTasks];
+                              next[i] = { ...next[i], day: task.day === d ? "" : d };
+                              setTemplateTasks(next);
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors ${task.day === d ? "bg-accent text-white" : "bg-white/5 text-white/30 hover:text-white"}`}
+                          >{d}</button>
+                        ))}
+                        {task.day && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...templateTasks];
+                              next[i] = { ...next[i], day: "" };
+                              setTemplateTasks(next);
+                            }}
+                            className="text-[10px] text-white/20 hover:text-accent ml-1"
+                          >clear</button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
@@ -420,6 +448,7 @@ export default function AssignedWorkCoach() {
                   {(templateMap.get(assignTemplateId)?.Tasks || []).map((task, i) => (
                     <li key={i} className="text-sm text-white/70 flex gap-2 items-center">
                       <span className="text-white/20">{i + 1}.</span>
+                      {task.day && <span className="text-[10px] font-bold text-accent/60 bg-accent/10 px-1.5 py-0.5 rounded">{task.day}</span>}
                       <span>{task.text}</span>
                       {task.videoUrl && <span className="text-xs text-accent/70">▶ video</span>}
                     </li>

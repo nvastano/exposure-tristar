@@ -4,13 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import LogoLoader from "@/components/LogoLoader";
 
-type Task = { text: string; videoUrl?: string };
+type Task = { text: string; videoUrl?: string; day?: string };
 type Template = { Id: string; Name: string; Tasks: Task[] };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string };
 type MetricRow = { Player: string; Metric: string; Value: string; Date: string };
 
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function todayDay(): string {
+  return DAYS[new Date().getDay()];
 }
 
 function toISO(dateStr: string): string {
@@ -127,9 +133,11 @@ function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTas
           const done = checked.has(taskId);
           const taskText = typeof task === "string" ? task : task.text;
           const videoUrl = typeof task === "string" ? undefined : task.videoUrl;
+          const taskDay = typeof task === "string" ? undefined : task.day;
+          const isToday = !taskDay || taskDay === todayDay();
           return (
             <div key={taskId} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
-              done ? "border-accent/20 bg-accent/8" : "border-white/5"
+              done ? "border-accent/20 bg-accent/8" : isToday ? "border-white/5" : "border-white/5 opacity-40"
             }`}>
               <button
                 onClick={() => toggle(taskId)}
@@ -140,7 +148,14 @@ function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTas
                 }`}>
                   {done ? "✓" : ""}
                 </span>
-                <span className={`text-sm ${done ? "line-through opacity-50 text-white/60" : "text-white"}`}>{taskText}</span>
+                <span className="flex-1 flex items-start gap-2">
+                  {taskDay && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${isToday ? "bg-accent/20 text-accent" : "bg-white/5 text-white/30"}`}>
+                      {taskDay}
+                    </span>
+                  )}
+                  <span className={`text-sm ${done ? "line-through opacity-50 text-white/60" : "text-white"}`}>{taskText}</span>
+                </span>
               </button>
               {videoUrl && (
                 <a
