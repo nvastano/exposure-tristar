@@ -40,6 +40,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignedChecked, setAssignedChecked] = useState<Record<string, boolean>>({});
   const triviaQuestion = useMemo(() => getRandomQuestion(), []);
 
   const templateMap = useMemo(() => new Map(templates.map(t => [t.Id, t])), [templates]);
@@ -61,11 +62,13 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       .map(a => {
         const tmpl = templateMap.get(a.TemplateId);
         if (!tmpl) return null;
-        const tasks = tmpl.Tasks.filter(t => !t.day || t.day === dow);
+        const tasks = tmpl.Tasks
+          .map((t, idx) => ({ ...t, taskIndex: idx }))
+          .filter(t => !t.day || t.day === dow);
         if (!tasks.length) return null;
-        return { name: tmpl.Name, tasks };
+        return { name: tmpl.Name, assignmentId: a.Id, tasks };
       })
-      .filter(Boolean) as { name: string; tasks: Task[] }[];
+      .filter(Boolean) as { name: string; assignmentId: string; tasks: (Task & { taskIndex: number })[] }[];
   }, [player, date, assignments, templateMap]);
 
   useEffect(() => {
@@ -124,6 +127,10 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
         metricEntries.push({ date, player, metric: "Drill", value: d.Name });
       });
 
+    Object.entries(assignedChecked).forEach(([key, checked]) => {
+      if (checked) metricEntries.push({ date, player, metric: "AssignedTask", value: key });
+    });
+
     if (!metricEntries.length) {
       setStatus("Enter at least one stat before submitting.");
       return;
@@ -136,6 +143,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       setMetricValues({});
       setOther("");
       setDrillsDone({});
+      setAssignedChecked({});
       onSaved?.();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
@@ -195,18 +203,26 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
               {dayAssignments.length > 1 && (
                 <p className="text-xs font-semibold text-white/50">{group.name}</p>
               )}
-              <ul className="flex flex-col gap-1">
-                {group.tasks.map((task, ti) => (
-                  <li key={ti} className="flex items-start gap-2 text-sm text-white/70">
-                    <span className="text-accent/50 mt-0.5">·</span>
-                    <span className="flex-1">{task.text}</span>
-                    {task.videoUrl && (
-                      <a href={task.videoUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-xs font-semibold text-accent hover:text-accent/70 shrink-0">▶ Watch</a>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-col gap-1.5">
+                {group.tasks.map((task) => {
+                  const key = `${group.assignmentId}:${task.taskIndex}`;
+                  const done = !!assignedChecked[key];
+                  return (
+                    <label key={key} className={`flex items-start gap-2.5 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${done ? "bg-accent/10" : "hover:bg-white/5"}`}>
+                      <span className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] transition-colors ${done ? "border-accent bg-accent text-white" : "border-white/30"}`}>
+                        {done ? "✓" : ""}
+                      </span>
+                      <input type="checkbox" checked={done} onChange={e => setAssignedChecked(prev => ({ ...prev, [key]: e.target.checked }))} className="sr-only" />
+                      <span className={`flex-1 text-sm transition-colors ${done ? "line-through opacity-50 text-white/50" : "text-white/70"}`}>{task.text}</span>
+                      {task.videoUrl && (
+                        <a href={task.videoUrl} target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs font-semibold text-accent hover:text-accent/70 shrink-0 mt-0.5">▶ Watch</a>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
