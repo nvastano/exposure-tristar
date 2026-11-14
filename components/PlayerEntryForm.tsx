@@ -8,9 +8,25 @@ import { getRandomQuestion } from "@/lib/trivia";
 import TriviaQuestionCard from "@/components/TriviaQuestion";
 
 const TODAY = localDateStr();
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 type PlayerRow = { Name: string };
 type DrillRow = { Id: string; Name: string };
+type Task = { text: string; videoUrl?: string; day?: string };
+type Template = { Id: string; Name: string; Tasks: Task[] };
+type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string };
+
+function toISO(s: string): string {
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  try { const d = new Date(s); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch {}
+  return s;
+}
+
+function dayOfWeek(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return isNaN(d.getTime()) ? "" : DAYS[d.getDay()];
+}
 
 export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
@@ -22,7 +38,35 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [drillsDone, setDrillsDone] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const triviaQuestion = useMemo(() => getRandomQuestion(), []);
+
+  const templateMap = useMemo(() => new Map(templates.map(t => [t.Id, t])), [templates]);
+
+  // Active assignments for the selected player on the selected date, with their day-filtered tasks
+  const dayAssignments = useMemo(() => {
+    if (!player || !date) return [];
+    const dow = dayOfWeek(date);
+    return assignments
+      .filter(a => {
+        const start = toISO(a.StartDate);
+        const end = toISO(a.EndDate);
+        return (
+          a.PlayerName.trim().toLowerCase() === player.trim().toLowerCase() &&
+          start <= date &&
+          (!end || end >= date)
+        );
+      })
+      .map(a => {
+        const tmpl = templateMap.get(a.TemplateId);
+        if (!tmpl) return null;
+        const tasks = tmpl.Tasks.filter(t => !t.day || t.day === dow);
+        if (!tasks.length) return null;
+        return { name: tmpl.Name, tasks };
+      })
+      .filter(Boolean) as { name: string; tasks: Task[] }[];
+  }, [player, date, assignments, templateMap]);
 
   useEffect(() => {
     (async () => {
@@ -40,6 +84,16 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       } catch {
         // sheet not connected yet
       }
+    })();
+    (async () => {
+      try {
+        const [t, a] = await Promise.all([
+          sheetsGet("assignmentTemplates") as Promise<Template[]>,
+          sheetsGet("assignments") as Promise<Assignment[]>,
+        ]);
+        setTemplates(Array.isArray(t) ? t : []);
+        setAssignments(Array.isArray(a) ? a : []);
+      } catch {}
     })();
   }, []);
 
@@ -130,6 +184,33 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
           className="bg-white/5 border border-white/10 rounded px-3 py-2"
         />
       </label>
+
+      {dayAssignments.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-accent/20 bg-accent/5 p-4">
+          <p className="text-xs font-bold tracking-widest uppercase text-accent/70">
+            Assigned for {dayOfWeek(date)}
+          </p>
+          {dayAssignments.map((group, gi) => (
+            <div key={gi} className="flex flex-col gap-1.5">
+              {dayAssignments.length > 1 && (
+                <p className="text-xs font-semibold text-white/50">{group.name}</p>
+              )}
+              <ul className="flex flex-col gap-1">
+                {group.tasks.map((task, ti) => (
+                  <li key={ti} className="flex items-start gap-2 text-sm text-white/70">
+                    <span className="text-accent/50 mt-0.5">·</span>
+                    <span className="flex-1">{task.text}</span>
+                    {task.videoUrl && (
+                      <a href={task.videoUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs font-semibold text-accent hover:text-accent/70 shrink-0">▶ Watch</a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-5 border-t border-white/10 pt-4">
         <span className="text-sm text-white/50">My Work Today</span>
