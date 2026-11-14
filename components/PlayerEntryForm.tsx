@@ -131,66 +131,73 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
         />
       </label>
 
-      <div className="flex flex-col gap-6 border-t border-white/10 pt-4">
+      <div className="flex flex-col gap-5 border-t border-white/10 pt-4">
         <span className="text-sm text-white/50">My Work Today</span>
         {METRIC_CATEGORIES.map((category) => {
           const defs = METRIC_DEFS.filter((def) => def.category === category);
           if (!defs.length) return null;
+          const numbers = defs.filter(d => d.type === "number");
+          const booleans = defs.filter(d => d.type === "boolean");
           return (
-            <div key={category} className="flex flex-col gap-3">
+            <div key={category} className="flex flex-col gap-2">
               <span className="text-xs font-semibold tracking-wide text-accent">{category}</span>
-              {defs.map((def) =>
-                def.type === "boolean" ? (
-                  <label key={def.key} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={metricValues[def.key] === true}
-                      onChange={(e) =>
-                        setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
-                      }
-                      className="w-4 h-4"
-                    />
-                    {def.label}
-                  </label>
-                ) : (
-                  <label key={def.key} className="flex flex-col gap-1 text-sm">
-                    {def.label}
-                    {def.unit && <span className="text-white/30 text-xs">{def.unit}</span>}
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={(metricValues[def.key] as string) || ""}
-                      onChange={(e) =>
-                        setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
-                      }
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 w-32"
-                    />
-                  </label>
-                )
+              {numbers.length > 0 && (
+                <div className="flex gap-3 flex-wrap">
+                  {numbers.map((def) => (
+                    <label key={def.key} className="flex flex-col gap-1 text-xs text-white/50">
+                      {def.label}{def.unit ? ` (${def.unit})` : ""}
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={(metricValues[def.key] as string) || ""}
+                        onChange={(e) =>
+                          setMetricValues((prev) => ({ ...prev, [def.key]: e.target.value }))
+                        }
+                        className="bg-white/5 border border-white/10 rounded px-2 py-1.5 w-20 text-sm text-white"
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+              {booleans.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {booleans.map((def) => (
+                    <label key={def.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={metricValues[def.key] === true}
+                        onChange={(e) =>
+                          setMetricValues((prev) => ({ ...prev, [def.key]: e.target.checked }))
+                        }
+                        className="w-4 h-4 shrink-0"
+                      />
+                      {def.label}
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
           );
         })}
 
         {drills.length > 0 && (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold tracking-wide text-accent">Specialized Drills</span>
-            <span className="text-white/30 text-xs">
-              Independent drills from the Drills page — check off any you worked on today.
-            </span>
-            {drills.map((drill) => (
-              <label key={drill.Id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={Boolean(drillsDone[drill.Id])}
-                  onChange={(e) =>
-                    setDrillsDone((prev) => ({ ...prev, [drill.Id]: e.target.checked }))
-                  }
-                  className="w-4 h-4"
-                />
-                {drill.Name}
-              </label>
-            ))}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {drills.map((drill) => (
+                <label key={drill.Id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(drillsDone[drill.Id])}
+                    onChange={(e) =>
+                      setDrillsDone((prev) => ({ ...prev, [drill.Id]: e.target.checked }))
+                    }
+                    className="w-4 h-4 shrink-0"
+                  />
+                  {drill.Name}
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
