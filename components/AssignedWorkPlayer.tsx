@@ -134,7 +134,7 @@ function AssignmentCard({ assignment, template, playerName, loggedTaskIds, onTas
           const taskText = typeof task === "string" ? task : task.text;
           const videoUrl = typeof task === "string" ? undefined : task.videoUrl;
           const taskDay = typeof task === "string" ? undefined : task.day;
-          const isToday = !taskDay || taskDay === todayDay();
+          const isToday = !taskDay || taskDay.split(",").includes(todayDay());
           return (
             <div key={taskId} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
               done ? "border-accent/20 bg-accent/8" : isToday ? "border-white/5" : "border-white/5 opacity-40"
