@@ -64,7 +64,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
         if (!tmpl) return null;
         const tasks = tmpl.Tasks
           .map((t, idx) => ({ ...t, taskIndex: idx }))
-          .filter(t => !t.day || t.day === dow);
+          .filter(t => !t.day || t.day.split(",").includes(dow));
         if (!tasks.length) return null;
         return { name: tmpl.Name, assignmentId: a.Id, tasks };
       })

@@ -9,6 +9,15 @@ type Template = { Id: string; Name: string; Tasks: Task[]; CreatedAt: string };
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string; Notes: string; CreatedAt: string };
 type PlayerRow = { Id: string; Name: string };
 
+const MID_WEEK_WORKOUT_TASKS: Task[] = [
+  { text: "20–30 minutes · Controlled reps · Rest as needed" },
+  { text: "Bodyweight squats — 2 x 8–10", day: "Wed,Thu" },
+  { text: "Push-ups (incline if needed) — 2 x 6–10", day: "Wed,Thu" },
+  { text: "Band rows — 2 x 10–12", day: "Wed,Thu" },
+  { text: "Glute bridges — 2 x 10", day: "Wed,Thu" },
+  { text: "Dead bugs — 2 x 6 each side", day: "Wed,Thu" },
+];
+
 const ARM_CARE_TASKS = [
   // MONDAY — Recovery + Mobility (no throwing or hard upper-body)
   "MON · Easy walk or marching in place | 3 min",
@@ -111,6 +120,11 @@ export default function AssignedWorkCoach() {
     await load();
   }
 
+  async function seedMidWeekWorkout() {
+    await sheetsPost("saveAssignmentTemplate", { name: "Mid-Week Workout", tasks: MID_WEEK_WORKOUT_TASKS });
+    await load();
+  }
+
   function openNewTemplate() {
     setEditingTemplate(null);
     setTemplateName("");
@@ -205,14 +219,18 @@ export default function AssignedWorkCoach() {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs font-bold tracking-widest uppercase text-white/40">Work Templates</h2>
           <div className="flex gap-2">
-            {templates.length === 0 && (
-              <button
-                onClick={seedArmCare}
-                className="text-xs border border-white/10 text-white/40 hover:text-white/70 px-3 py-1.5 rounded transition-colors"
-              >
-                + Add Arm Care
-              </button>
-            )}
+            <button
+              onClick={seedArmCare}
+              className="text-xs border border-white/10 text-white/40 hover:text-white/70 px-3 py-1.5 rounded transition-colors"
+            >
+              + Arm Care
+            </button>
+            <button
+              onClick={seedMidWeekWorkout}
+              className="text-xs border border-white/10 text-white/40 hover:text-white/70 px-3 py-1.5 rounded transition-colors"
+            >
+              + Mid-Week Workout
+            </button>
             <button
               onClick={openNewTemplate}
               className="text-xs border border-accent/40 text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors"
@@ -274,18 +292,24 @@ export default function AssignedWorkCoach() {
                       />
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] text-white/30 mr-0.5">Day:</span>
-                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => {
-                              const next = [...templateTasks];
-                              next[i] = { ...next[i], day: task.day === d ? "" : d };
-                              setTemplateTasks(next);
-                            }}
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors ${task.day === d ? "bg-accent text-white" : "bg-white/5 text-white/30 hover:text-white"}`}
-                          >{d}</button>
-                        ))}
+                        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => {
+                          const activeDays = task.day ? task.day.split(",") : [];
+                          const isActive = activeDays.includes(d);
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => {
+                                const next = [...templateTasks];
+                                const days = task.day ? task.day.split(",").filter(Boolean) : [];
+                                const newDays = isActive ? days.filter(x => x !== d) : [...days, d];
+                                next[i] = { ...next[i], day: newDays.join(",") };
+                                setTemplateTasks(next);
+                              }}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors ${isActive ? "bg-accent text-white" : "bg-white/5 text-white/30 hover:text-white"}`}
+                            >{d}</button>
+                          );
+                        })}
                         {task.day && (
                           <button
                             type="button"
