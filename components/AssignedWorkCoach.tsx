@@ -218,26 +218,12 @@ export default function AssignedWorkCoach() {
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs font-bold tracking-widest uppercase text-white/40">Work Templates</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={seedArmCare}
-              className="text-xs border border-white/10 text-white/40 hover:text-white/70 px-3 py-1.5 rounded transition-colors"
-            >
-              + Arm Care
-            </button>
-            <button
-              onClick={seedMidWeekWorkout}
-              className="text-xs border border-white/10 text-white/40 hover:text-white/70 px-3 py-1.5 rounded transition-colors"
-            >
-              + Mid-Week Workout
-            </button>
-            <button
-              onClick={openNewTemplate}
-              className="text-xs border border-accent/40 text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors"
-            >
-              + New Template
-            </button>
-          </div>
+          <button
+            onClick={openNewTemplate}
+            className="text-xs border border-accent/40 text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors"
+          >
+            + New Template
+          </button>
         </div>
 
         {/* Template editor */}
@@ -358,7 +344,7 @@ export default function AssignedWorkCoach() {
             </div>
           ))}
           {templates.length === 0 && !isEditing && (
-            <p className="text-white/30 text-sm py-4 text-center">No templates yet. Create one above or add the Arm Care template.</p>
+            <p className="text-white/30 text-sm py-4 text-center">No templates yet. Click + New Template to create one.</p>
           )}
         </div>
       </section>
