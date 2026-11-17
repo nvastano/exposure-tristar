@@ -18,6 +18,7 @@ const COACH_LINKS = [
   { href: "/coaches?tab=plan", label: "Practice Plan" },
   { href: "/coaches?tab=stats", label: "Practice Stats" },
   { href: "/coaches?tab=assigned", label: "Assigned Work" },
+  { href: "/coaches?tab=attendance", label: "Practice Attendance" },
   { href: "/monthly-report", label: "Monthly Report" },
 ];
 
