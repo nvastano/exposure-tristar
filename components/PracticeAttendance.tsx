@@ -32,6 +32,7 @@ export default function PracticeAttendance() {
 
   // Log practice form state
   const [showForm, setShowForm] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
   const [formLabel, setFormLabel] = useState("");
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({});
@@ -57,13 +58,45 @@ export default function PracticeAttendance() {
   useEffect(() => { load(); }, []);
 
   function openForm() {
+    setEditingSessionId(null);
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormLabel("");
     setGuests([]);
     setGuestInput("");
-    // Default everyone to present
     const init: Record<string, AttendanceRecord> = {};
     players.forEach(p => { init[p.Name] = { playerName: p.Name, present: true, reason: "" }; });
+    setRecords(init);
+    setShowForm(true);
+  }
+
+  function openEditForm(session: PracticeSession) {
+    setEditingSessionId(session.Id);
+    setFormDate(toISO(session.Date));
+    setFormLabel(session.Label || "");
+    setGuestInput("");
+
+    const rosterNames = new Set(players.map(p => p.Name.trim().toLowerCase()));
+    const sessionRecs = attendanceMap.get(session.Id);
+    const init: Record<string, AttendanceRecord> = {};
+    const detectedGuests: string[] = [];
+
+    // Pre-fill roster players from saved attendance, default to present if no record
+    players.forEach(p => {
+      const saved = sessionRecs?.get(p.Name.trim().toLowerCase());
+      init[p.Name] = { playerName: p.Name, present: saved ? saved.Present === "yes" : true, reason: saved?.Reason || "" };
+    });
+
+    // Detect guest players (in attendance but not on roster)
+    if (sessionRecs) {
+      for (const rec of sessionRecs.values()) {
+        if (!rosterNames.has(rec.PlayerName.trim().toLowerCase())) {
+          detectedGuests.push(rec.PlayerName);
+          init[rec.PlayerName] = { playerName: rec.PlayerName, present: rec.Present === "yes", reason: rec.Reason || "" };
+        }
+      }
+    }
+
+    setGuests(detectedGuests);
     setRecords(init);
     setShowForm(true);
   }
@@ -85,12 +118,17 @@ export default function PracticeAttendance() {
     setSaving(true);
     const allNames = [...players.map(p => p.Name), ...guests];
     try {
-      const { id } = await sheetsPost("createPracticeSession", { date: formDate, label: formLabel.trim() }) as { id: string };
+      let sessionId = editingSessionId;
+      if (!sessionId) {
+        const { id } = await sheetsPost("createPracticeSession", { date: formDate, label: formLabel.trim() }) as { id: string };
+        sessionId = id;
+      }
       await sheetsPost("saveAttendance", {
-        sessionId: id,
+        sessionId,
         records: allNames.map(name => records[name] || { playerName: name, present: true, reason: "" }),
       });
       setShowForm(false);
+      setEditingSessionId(null);
       await load();
     } finally {
       setSaving(false);
@@ -166,7 +204,7 @@ export default function PracticeAttendance() {
       {/* Log practice form */}
       {showForm && (
         <div className="rounded-xl border border-white/10 bg-white/3 p-5 flex flex-col gap-5">
-          <p className="text-xs font-bold tracking-widest uppercase text-white/40">New Practice</p>
+          <p className="text-xs font-bold tracking-widest uppercase text-white/40">{editingSessionId ? "Edit Practice" : "New Practice"}</p>
 
           <div className="flex gap-3 flex-wrap">
             <label className="flex flex-col gap-1 text-xs text-white/40">
@@ -309,7 +347,7 @@ export default function PracticeAttendance() {
               disabled={saving || !formDate}
               className="bg-accent hover:bg-accent/80 text-white text-sm font-bold px-4 py-2 rounded transition-colors disabled:opacity-40"
             >
-              {saving ? "Saving…" : "Save Practice"}
+              {saving ? "Saving…" : editingSessionId ? "Update Practice" : "Save Practice"}
             </button>
             <button
               onClick={() => setShowForm(false)}
@@ -404,10 +442,16 @@ export default function PracticeAttendance() {
                       {presentCount} of {totalCount} present
                     </p>
                   </div>
-                  <button
-                    onClick={() => deleteSession(s.Id)}
-                    className="text-xs text-white/20 hover:text-accent transition-colors"
-                  >Delete</button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => openEditForm(s)}
+                      className="text-xs text-white/30 hover:text-white transition-colors"
+                    >Edit</button>
+                    <button
+                      onClick={() => deleteSession(s.Id)}
+                      className="text-xs text-white/20 hover:text-accent transition-colors"
+                    >Delete</button>
+                  </div>
                 </div>
 
                 {absentRecs.length > 0 && (
