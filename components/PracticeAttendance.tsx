@@ -35,6 +35,8 @@ export default function PracticeAttendance() {
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
   const [formLabel, setFormLabel] = useState("");
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({});
+  const [guests, setGuests] = useState<string[]>([]);
+  const [guestInput, setGuestInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   // View toggle
@@ -57,6 +59,8 @@ export default function PracticeAttendance() {
   function openForm() {
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormLabel("");
+    setGuests([]);
+    setGuestInput("");
     // Default everyone to present
     const init: Record<string, AttendanceRecord> = {};
     players.forEach(p => { init[p.Name] = { playerName: p.Name, present: true, reason: "" }; });
@@ -64,13 +68,27 @@ export default function PracticeAttendance() {
     setShowForm(true);
   }
 
+  function addGuest() {
+    const name = guestInput.trim();
+    if (!name || guests.includes(name)) return;
+    setGuests(prev => [...prev, name]);
+    setRecords(prev => ({ ...prev, [name]: { playerName: name, present: true, reason: "" } }));
+    setGuestInput("");
+  }
+
+  function removeGuest(name: string) {
+    setGuests(prev => prev.filter(g => g !== name));
+    setRecords(prev => { const next = { ...prev }; delete next[name]; return next; });
+  }
+
   async function saveSession() {
     setSaving(true);
+    const allNames = [...players.map(p => p.Name), ...guests];
     try {
       const { id } = await sheetsPost("createPracticeSession", { date: formDate, label: formLabel.trim() }) as { id: string };
       await sheetsPost("saveAttendance", {
         sessionId: id,
-        records: players.map(p => records[p.Name] || { playerName: p.Name, present: true, reason: "" }),
+        records: allNames.map(name => records[name] || { playerName: name, present: true, reason: "" }),
       });
       setShowForm(false);
       await load();
@@ -221,6 +239,68 @@ export default function PracticeAttendance() {
                 );
               })}
             </div>
+          </div>
+
+          {/* Guest players */}
+          <div className="flex flex-col gap-2 border-t border-white/5 pt-4">
+            <p className="text-xs text-white/40">Guest Players</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={guestInput}
+                onChange={e => setGuestInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addGuest(); } }}
+                placeholder="Guest name..."
+                className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+              />
+              <button
+                type="button"
+                onClick={addGuest}
+                disabled={!guestInput.trim()}
+                className="text-xs border border-accent/40 text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors disabled:opacity-30"
+              >Add</button>
+            </div>
+            {guests.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {guests.map(name => {
+                  const rec = records[name] || { playerName: name, present: true, reason: "" };
+                  return (
+                    <div key={name} className={`rounded-lg border p-3 flex flex-col gap-2 transition-colors ${rec.present ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{name}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/20 text-accent">Guest</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex rounded overflow-hidden border border-white/10 text-xs font-bold">
+                            <button
+                              type="button"
+                              onClick={() => setRecords(prev => ({ ...prev, [name]: { ...prev[name], playerName: name, present: true } }))}
+                              className={`px-3 py-1 transition-colors ${rec.present ? "bg-green-500/30 text-green-300" : "text-white/30 hover:text-white/60"}`}
+                            >Present</button>
+                            <button
+                              type="button"
+                              onClick={() => setRecords(prev => ({ ...prev, [name]: { ...prev[name], playerName: name, present: false } }))}
+                              className={`px-3 py-1 transition-colors ${!rec.present ? "bg-red-500/30 text-red-300" : "text-white/30 hover:text-white/60"}`}
+                            >Absent</button>
+                          </div>
+                          <button onClick={() => removeGuest(name)} className="text-white/20 hover:text-accent text-lg leading-none px-1">×</button>
+                        </div>
+                      </div>
+                      {!rec.present && (
+                        <input
+                          type="text"
+                          value={rec.reason}
+                          onChange={e => setRecords(prev => ({ ...prev, [name]: { ...prev[name], reason: e.target.value } }))}
+                          placeholder="Reason (optional)"
+                          className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-accent/40"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2">
