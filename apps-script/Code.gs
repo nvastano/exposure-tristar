@@ -26,6 +26,8 @@ var HOMEWORK_SHEET = "Homework";
 var HOMEWORK_COMPLETIONS_SHEET = "HomeworkCompletions";
 var ASSIGNMENT_TEMPLATES_SHEET = "AssignmentTemplates";
 var ASSIGNMENTS_SHEET = "Assignments";
+var PRACTICE_SESSIONS_SHEET = "PracticeSessions";
+var PRACTICE_ATTENDANCE_SHEET = "PracticeAttendance";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -391,6 +393,14 @@ function doGet(e) {
       });
     }
     result = allAssignments;
+  } else if (action === "practiceSessions") {
+    var psSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
+    backfillIds_(psSheet);
+    result = rowsToObjects_(psSheet.getDataRange().getValues());
+  } else if (action === "practiceAttendance") {
+    var paSheet = getSheet_(PRACTICE_ATTENDANCE_SHEET, ["Id", "SessionId", "PlayerName", "Present", "Reason", "CreatedAt"]);
+    backfillIds_(paSheet);
+    result = rowsToObjects_(paSheet.getDataRange().getValues());
   } else if (action === "homework") {
     var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
     var hwData = hwSheet.getDataRange().getValues();
@@ -1108,6 +1118,59 @@ function doPost(e) {
     var daRow = findRowById_(daSheet, body.id);
     if (daRow === -1) { result = { error: "assignment not found" }; }
     else { daSheet.deleteRow(daRow); result = { ok: true }; }
+  } else if (body.action === "createPracticeSession") {
+    var cpsSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
+    backfillIds_(cpsSheet);
+    var cpsId = newId_();
+    appendRowByHeaders_(cpsSheet, {
+      Id: cpsId,
+      Date: body.date || new Date().toISOString().slice(0, 10),
+      Label: body.label || "",
+      CreatedAt: new Date().toISOString(),
+    });
+    result = { ok: true, id: cpsId };
+  } else if (body.action === "deletePracticeSession") {
+    var dpsSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
+    var dpsRow = findRowById_(dpsSheet, body.id);
+    if (dpsRow === -1) { result = { error: "session not found" }; }
+    else {
+      dpsSheet.deleteRow(dpsRow);
+      // Also delete all attendance rows for this session
+      var dpaSheet = getSheet_(PRACTICE_ATTENDANCE_SHEET, ["Id", "SessionId", "PlayerName", "Present", "Reason", "CreatedAt"]);
+      backfillIds_(dpaSheet);
+      var dpaData = dpaSheet.getDataRange().getValues();
+      var dpaSessionCol = ensureColumn_(dpaSheet, "SessionId");
+      for (var dpai = dpaData.length - 1; dpai >= 1; dpai--) {
+        if (String(dpaData[dpai][dpaSessionCol - 1]) === String(body.id)) {
+          dpaSheet.deleteRow(dpai + 1);
+        }
+      }
+      result = { ok: true };
+    }
+  } else if (body.action === "saveAttendance") {
+    // body.sessionId, body.records: [{ playerName, present, reason }]
+    var saSheet = getSheet_(PRACTICE_ATTENDANCE_SHEET, ["Id", "SessionId", "PlayerName", "Present", "Reason", "CreatedAt"]);
+    backfillIds_(saSheet);
+    var saSessionCol = ensureColumn_(saSheet, "SessionId");
+    var saData = saSheet.getDataRange().getValues();
+    // Delete existing rows for this session first
+    for (var sai = saData.length - 1; sai >= 1; sai--) {
+      if (String(saData[sai][saSessionCol - 1]) === String(body.sessionId)) {
+        saSheet.deleteRow(sai + 1);
+      }
+    }
+    // Append new rows
+    (body.records || []).forEach(function(rec) {
+      appendRowByHeaders_(saSheet, {
+        Id: newId_(),
+        SessionId: body.sessionId,
+        PlayerName: rec.playerName || "",
+        Present: rec.present ? "yes" : "no",
+        Reason: rec.reason || "",
+        CreatedAt: new Date().toISOString(),
+      });
+    });
+    result = { ok: true };
   } else if (body.action === "logFundraiserSale") {
     var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
     backfillIds_(fsSheet);
