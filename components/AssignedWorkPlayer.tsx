@@ -31,8 +31,15 @@ function toISO(dateStr: string): string {
   return dateStr;
 }
 
+function weekStart(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  return new Date(d.getFullYear(), d.getMonth(), diff).toISOString().slice(0, 10);
+}
+
 function storageKey(assignmentId: string, playerName: string) {
-  return `aw_${assignmentId}_${playerName.trim().toLowerCase()}`;
+  return `aw_${assignmentId}_${playerName.trim().toLowerCase()}_${weekStart()}`;
 }
 
 function loadChecked(assignmentId: string, playerName: string): Set<string> {
@@ -216,11 +223,16 @@ export default function AssignedWorkPlayer({ playerName }: Props) {
     });
   }, [assignments, playerName]);
 
-  // Tasks already logged to Metrics per assignment
+  // Tasks already logged to Metrics per assignment — current week only
   const loggedByAssignment = useMemo(() => {
+    const ws = weekStart();
     const map = new Map<string, Set<string>>();
     for (const m of metrics) {
-      if (m.Metric === "AssignedTask" && String(m.Player).trim().toLowerCase() === playerName.trim().toLowerCase()) {
+      if (
+        m.Metric === "AssignedTask" &&
+        String(m.Player).trim().toLowerCase() === playerName.trim().toLowerCase() &&
+        toISO(m.Date) >= ws
+      ) {
         const [assignId, taskId] = String(m.Value).split(":");
         if (!map.has(assignId)) map.set(assignId, new Set());
         map.get(assignId)!.add(taskId);
