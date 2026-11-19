@@ -1129,6 +1129,18 @@ function doPost(e) {
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true, id: cpsId };
+  } else if (body.action === "updatePracticeSession") {
+    var upsSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
+    backfillIds_(upsSheet);
+    var upsRow = findRowById_(upsSheet, body.id);
+    if (upsRow === -1) { result = { error: "session not found" }; }
+    else {
+      var upsDateCol = ensureColumn_(upsSheet, "Date");
+      var upsLabelCol = ensureColumn_(upsSheet, "Label");
+      upsSheet.getRange(upsRow, upsDateCol).setValue(body.date || "");
+      upsSheet.getRange(upsRow, upsLabelCol).setValue(body.label || "");
+      result = { ok: true };
+    }
   } else if (body.action === "deletePracticeSession") {
     var dpsSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
     var dpsRow = findRowById_(dpsSheet, body.id);

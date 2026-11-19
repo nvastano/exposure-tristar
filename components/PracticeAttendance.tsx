@@ -122,6 +122,8 @@ export default function PracticeAttendance() {
       if (!sessionId) {
         const { id } = await sheetsPost("createPracticeSession", { date: formDate, label: formLabel.trim() }) as { id: string };
         sessionId = id;
+      } else {
+        await sheetsPost("updatePracticeSession", { id: sessionId, date: formDate, label: formLabel.trim() });
       }
       await sheetsPost("saveAttendance", {
         sessionId,
