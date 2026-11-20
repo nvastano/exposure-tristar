@@ -134,7 +134,16 @@ function playersSheet_() {
   ensureColumn_(sheet, "Number");
   ensureColumn_(sheet, "Position");
   ensureColumn_(sheet, "CreatedAt");
+  ensureColumn_(sheet, "Status");
   backfillIds_(sheet);
+  // Backfill Status = "active" for any row that has no value
+  var statusCol = ensureColumn_(sheet, "Status");
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][statusCol - 1]) {
+      sheet.getRange(i + 1, statusCol).setValue("active");
+    }
+  }
   return sheet;
 }
 
@@ -311,7 +320,13 @@ function doGet(e) {
   var action = e.parameter.action;
   var result;
   if (action === "players") {
-    result = rowsToObjects_(playersSheet_().getDataRange().getValues());
+    var allPlayers = rowsToObjects_(playersSheet_().getDataRange().getValues());
+    if (e.parameter.includeInactive !== "1") {
+      allPlayers = allPlayers.filter(function(row) {
+        return String(row.Status || "active").trim().toLowerCase() !== "inactive";
+      });
+    }
+    result = allPlayers;
   } else if (action === "entries") {
     var all = rowsToObjects_(entriesSheet_().getDataRange().getValues());
     if (e.parameter.player) {
@@ -480,6 +495,16 @@ function doPost(e) {
       result = { error: "player not found" };
     } else {
       pSheet2.deleteRow(pRow2);
+      result = { ok: true };
+    }
+  } else if (body.action === "updatePlayerStatus") {
+    var upsStatusSheet = playersSheet_();
+    var upsStatusRow = findRowById_(upsStatusSheet, body.id);
+    if (upsStatusRow === -1) {
+      result = { error: "player not found" };
+    } else {
+      var upsStatusCol = ensureColumn_(upsStatusSheet, "Status");
+      upsStatusSheet.getRange(upsStatusRow, upsStatusCol).setValue(body.status || "active");
       result = { ok: true };
     }
   } else if (body.action === "addEntry") {

@@ -32,7 +32,7 @@ type PlayerProfile = {
   Address: string; City: string; State: string; Zip: string; CreatedAt: string;
 };
 
-type PlayerRow = { Id: string; Name: string; Number?: string };
+type PlayerRow = { Id: string; Name: string; Number?: string; Status?: string };
 
 function height(p: PlayerProfile) {
   if (!p.HeightFt) return "—";
@@ -99,26 +99,40 @@ function RosterProfiles() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [selectedFields, setSelectedFields] = useState<Set<ExportKey>>(
     new Set(["Player", "DOB", "Height", "Weight", "Throws", "Bats", "Parent1Name", "Parent1Phone"])
   );
 
-  useEffect(() => {
-    Promise.all([
-      sheetsGet("players") as Promise<PlayerRow[]>,
+  async function loadPlayers() {
+    const [p, pr] = await Promise.all([
+      (sheetsGet("players", { includeInactive: "1" }) as Promise<PlayerRow[]>),
       (sheetsGet("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
-    ]).then(([p, pr]) => {
-      setPlayers(p);
-      setProfiles(pr);
-    }).finally(() => setLoading(false));
-  }, []);
+    ]);
+    setPlayers(p);
+    setProfiles(pr);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadPlayers(); }, []);
+
+  async function toggleStatus(player: PlayerRow) {
+    const newStatus = (player.Status || "active") === "active" ? "inactive" : "active";
+    setTogglingId(player.Id);
+    await sheetsPost("updatePlayerStatus", { id: player.Id, status: newStatus });
+    setPlayers((prev) => prev.map((p) => p.Id === player.Id ? { ...p, Status: newStatus } : p));
+    setTogglingId(null);
+  }
 
   if (loading) return <LogoLoader />;
 
   const profileMap = new Map(profiles.map((p) => [p.Player.trim().toLowerCase(), p]));
-  const filtered = players.filter((p) =>
-    p.Name.toLowerCase().includes(search.toLowerCase())
-  );
+  const visiblePlayers = players.filter((p) => {
+    const isActive = (p.Status || "active") !== "inactive";
+    return (showInactive ? true : isActive) && p.Name.toLowerCase().includes(search.toLowerCase());
+  });
+  const filtered = visiblePlayers;
   const submitted = filtered.filter((p) => profileMap.has(p.Name.trim().toLowerCase()));
   const missing = filtered.filter((p) => !profileMap.has(p.Name.trim().toLowerCase()));
 
@@ -143,11 +157,32 @@ function RosterProfiles() {
   function PlayerCard({ p }: { p: PlayerRow }) {
     const profile = profileMap.get(p.Name.trim().toLowerCase());
     const isOpen = expanded === p.Name;
+    const isActive = (p.Status || "active") !== "inactive";
+    const isToggling = togglingId === p.Id;
+
+    const StatusToggle = () => (
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleStatus(p); }}
+        disabled={isToggling}
+        className={`text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors ${
+          isActive
+            ? "border-green-500/40 text-green-400 hover:border-red-400/50 hover:text-red-400"
+            : "border-white/20 text-white/30 hover:border-green-500/40 hover:text-green-400"
+        } ${isToggling ? "opacity-40" : ""}`}
+        title={isActive ? "Mark inactive" : "Mark active"}
+      >
+        {isToggling ? "…" : isActive ? "Active" : "Inactive"}
+      </button>
+    );
+
     if (!profile) {
       return (
         <div className="rounded-lg border border-white/10 bg-white/3 p-4 flex items-center justify-between gap-3">
-          <span className="font-semibold text-sm">{p.Name}</span>
-          <span className="text-xs text-white/30 italic">Not submitted</span>
+          <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/30 italic">Not submitted</span>
+            <StatusToggle />
+          </div>
         </div>
       );
     }
@@ -157,8 +192,9 @@ function RosterProfiles() {
           onClick={() => setExpanded(isOpen ? null : p.Name)}
           className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
         >
-          <span className="font-semibold text-sm">{p.Name}</span>
+          <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
           <div className="flex items-center gap-3 text-xs text-white/40">
+            <StatusToggle />
             <span>{profile.Parent1Name || "—"}</span>
             <span>{profile.Parent1Phone || "—"}</span>
             <span className={`transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}>▾</span>
@@ -218,10 +254,13 @@ function RosterProfiles() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <p className="text-xs text-white/40">
-            {submitted.length} of {players.length} profiles submitted
+            {submitted.length} of {filtered.length} profiles submitted
+            {players.filter(p => (p.Status || "active") === "inactive").length > 0 && !showInactive && (
+              <span className="ml-2 text-white/25">· {players.filter(p => (p.Status || "active") === "inactive").length} inactive hidden</span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             type="text"
             value={search}
@@ -229,6 +268,12 @@ function RosterProfiles() {
             placeholder="Search players..."
             className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-48"
           />
+          <button
+            onClick={() => setShowInactive((v) => !v)}
+            className={`px-3 py-1.5 rounded border text-sm font-semibold transition-colors ${showInactive ? "border-accent/60 text-accent bg-accent/10" : "border-white/10 text-white/50 hover:text-white hover:border-white/30"}`}
+          >
+            {showInactive ? "Hide Inactive" : "Show Inactive"}
+          </button>
           <button
             onClick={() => setShowExport((v) => !v)}
             className={`px-3 py-1.5 rounded border text-sm font-semibold transition-colors ${showExport ? "border-accent/60 text-accent bg-accent/10" : "border-white/10 text-white/50 hover:text-white hover:border-white/30"}`}
