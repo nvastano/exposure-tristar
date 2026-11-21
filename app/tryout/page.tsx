@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sheetsPost } from "@/lib/sheets";
 
 const POSITIONS = ["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"] as const;
 
@@ -129,6 +130,8 @@ function ScoringModal({
   const [exitVelo, setExitVelo] = useState(player.exitVelo);
   const [throwVelo, setThrowVelo] = useState(player.throwVelo);
   const [notes, setNotes] = useState(player.notes);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function setScore(key: CategoryKey, val: number) {
     setScores((prev) => ({ ...prev, [key]: val }));
@@ -226,19 +229,47 @@ function ScoringModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-white/10 px-5 py-4 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave({ ...player, scores, exitVelo, throwVelo, notes })}
-            className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors"
-          >
-            Save Scores
-          </button>
+        <div className="shrink-0 border-t border-white/10 px-5 py-4 flex flex-col gap-2">
+          {saveError && <p className="text-red-400 text-xs text-center">{saveError}</p>}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 py-3 rounded-xl border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaveError(null);
+                setSaving(true);
+                const updated = { ...player, scores, exitVelo, throwVelo, notes };
+                try {
+                  await sheetsPost("saveTryoutPlayer", {
+                    playerName: updated.name,
+                    age: updated.age,
+                    positions: updated.pos.join(", "),
+                    tryoutDate: new Date().toISOString().slice(0, 10),
+                    ...Object.fromEntries(
+                      CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])
+                    ),
+                    exitVelo: updated.exitVelo,
+                    throwVelo: updated.throwVelo,
+                    notes: updated.notes,
+                  });
+                } catch {
+                  setSaveError("Sheet save failed — scores kept locally.");
+                } finally {
+                  setSaving(false);
+                  onSave(updated);
+                }
+              }}
+              className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Save Scores"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
