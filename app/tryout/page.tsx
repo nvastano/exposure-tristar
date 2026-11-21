@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+const POSITIONS = ["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"] as const;
+
 const CATEGORIES = [
   { key: "footSpeed",     label: "Foot Speed" },
   { key: "throwingSpeed", label: "Throwing Speed" },
@@ -19,7 +21,7 @@ type Player = {
   id: number;
   name: string;
   age: string;
-  pos: string;
+  pos: string[];
   notes: string;
   scores: Scores;
 };
@@ -39,6 +41,37 @@ function scoreColor(n: number | null): string {
   if (n >= 7) return "text-emerald-400";
   if (n >= 5) return "text-yellow-400";
   return "text-red-400";
+}
+
+// ── Position picker ───────────────────────────────────────────────
+function PositionPicker({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (pos: string[]) => void;
+}) {
+  function toggle(p: string) {
+    onChange(selected.includes(p) ? selected.filter((x) => x !== p) : [...selected, p]);
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {POSITIONS.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => toggle(p)}
+          className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${
+            selected.includes(p)
+              ? "bg-white text-black"
+              : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // ── Score button row ──────────────────────────────────────────────
@@ -109,9 +142,9 @@ function ScoringModal({
           <div>
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Scoring</p>
             <h2 className="text-xl font-black">{player.name}</h2>
-            {(player.age || player.pos) && (
+            {(player.age || player.pos.length > 0) && (
               <p className="text-xs text-white/40 mt-0.5">
-                {[player.age ? `Age ${player.age}` : "", player.pos].filter(Boolean).join(" · ")}
+                {[player.age ? `Age ${player.age}` : "", player.pos.join("/")].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -200,8 +233,8 @@ function PlayerCard({
         <p className={`text-2xl font-black tabular-nums ${scoreColor(average)}`}>
           {average !== null ? average.toFixed(1) : "—"}
         </p>
-        {(player.pos || player.age) && (
-          <p className="text-xs text-white/30">{[player.pos, player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}</p>
+        {(player.pos.length > 0 || player.age) && (
+          <p className="text-xs text-white/30">{[player.pos.join("/"), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}</p>
         )}
       </div>
     </button>
@@ -212,7 +245,7 @@ function PlayerCard({
 function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
-  const [pos, setPos] = useState("");
+  const [pos, setPos] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
 
   function submit(e: React.FormEvent) {
@@ -222,7 +255,7 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     onAdd({ id: Date.now(), name: n, age, pos, notes: "", scores: emptyScores() });
     setName("");
     setAge("");
-    setPos("");
+    setPos([]);
   }
 
   if (!open) {
@@ -247,26 +280,18 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
         placeholder="Player name"
         className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
       />
-      <div className="flex gap-2">
-        <input
-          type="number"
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-          placeholder="Age"
-          min={5}
-          max={18}
-          className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-20"
-        />
-        <select
-          value={pos}
-          onChange={(e) => setPos(e.target.value)}
-          className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
-        >
-          <option value="">Position (optional)</option>
-          {["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"].map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
+      <input
+        type="number"
+        value={age}
+        onChange={(e) => setAge(e.target.value)}
+        placeholder="Age (optional)"
+        min={5}
+        max={18}
+        className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
+      />
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Positions</span>
+        <PositionPicker selected={pos} onChange={setPos} />
       </div>
       <div className="flex gap-2">
         <button
