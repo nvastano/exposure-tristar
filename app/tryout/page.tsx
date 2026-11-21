@@ -428,7 +428,7 @@ export default function TryoutPage() {
             </table>
           </div>
           <div className="px-4 py-2 border-t border-white/5 text-xs text-white/20">
-            FS · TS · Hi · Pi · Ca · Fi · OA
+            {CATEGORIES.map((c) => c.label.split(" ").map((w) => w[0]).join("")).join(" · ")}
           </div>
         </div>
       )}
