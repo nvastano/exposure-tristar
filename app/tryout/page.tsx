@@ -262,29 +262,30 @@ function PlayerCard({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl p-4 transition-all flex items-center justify-between gap-3"
+      className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl p-4 transition-all flex items-center gap-3"
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="text-xs font-bold text-white/30 w-5 shrink-0 tabular-nums">#{rank}</span>
-        <div className="min-w-0">
-          <p className="font-bold truncate">{player.name}</p>
-          <p className="text-xs text-white/40 mt-0.5">
-            {complete ? "Complete" : scored === 0 ? "Not yet scored" : `${scored}/${CATEGORIES.length} scored`}
+      <span className="text-xs font-bold text-white/30 w-5 shrink-0 tabular-nums">#{rank}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold truncate">{player.name}</p>
+        <p className="text-xs text-white/40 mt-0.5">
+          {complete ? "Complete ✓" : scored === 0 ? "Not yet scored" : `${scored}/${CATEGORIES.length} scored`}
+        </p>
+        {(player.pos.length > 0 || player.age) && (
+          <p className="text-xs text-white/30 mt-0.5 truncate">
+            {[player.pos.join(" / "), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}
           </p>
-        </div>
+        )}
+        {(player.exitVelo || player.throwVelo) && (
+          <p className="text-xs text-white/30 tabular-nums mt-0.5">
+            {[player.exitVelo ? `EV ${player.exitVelo} mph` : "", player.throwVelo ? `TV ${player.throwVelo} mph` : ""].filter(Boolean).join(" · ")}
+          </p>
+        )}
       </div>
       <div className="shrink-0 text-right">
         <p className={`text-2xl font-black tabular-nums ${scoreColor(average)}`}>
           {average !== null ? average.toFixed(1) : "—"}
         </p>
-        {(player.pos.length > 0 || player.age) && (
-          <p className="text-xs text-white/30">{[player.pos.join("/"), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}</p>
-        )}
-        {(player.exitVelo || player.throwVelo) && (
-          <p className="text-xs text-white/30 tabular-nums">
-            {[player.exitVelo ? `EV ${player.exitVelo}` : "", player.throwVelo ? `TV ${player.throwVelo}` : ""].filter(Boolean).join(" · ")}
-          </p>
-        )}
+        <p className="text-xs text-white/30">/5</p>
       </div>
     </button>
   );
