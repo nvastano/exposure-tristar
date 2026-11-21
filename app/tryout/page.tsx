@@ -5,13 +5,15 @@ import { useState } from "react";
 const POSITIONS = ["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"] as const;
 
 const CATEGORIES = [
-  { key: "footSpeed",     label: "Foot Speed" },
-  { key: "throwingSpeed", label: "Throwing Speed" },
-  { key: "hitting",       label: "Hitting" },
-  { key: "pitching",      label: "Pitching" },
-  { key: "catching",      label: "Catching" },
-  { key: "fielding",      label: "Fielding" },
-  { key: "athleticism",   label: "Overall Athleticism" },
+  { key: "effort",            label: "Effort" },
+  { key: "attitude",          label: "Attitude" },
+  { key: "recovery",          label: "Recovery" },
+  { key: "parentConvo",       label: "Parent Convo" },
+  { key: "takingCorrection",  label: "Taking Correction" },
+  { key: "swing",             label: "Swing" },
+  { key: "fieldingMechanics", label: "Fielding Mechanics" },
+  { key: "personalAppearance",label: "Personal Appearance" },
+  { key: "arrivalTime",       label: "Arrival Time" },
 ] as const;
 
 type CategoryKey = (typeof CATEGORIES)[number]["key"];
@@ -38,8 +40,8 @@ function avg(scores: Scores): number | null {
 
 function scoreColor(n: number | null): string {
   if (n === null) return "text-white/30";
-  if (n >= 7) return "text-emerald-400";
-  if (n >= 5) return "text-yellow-400";
+  if (n >= 4) return "text-emerald-400";
+  if (n >= 3) return "text-yellow-400";
   return "text-red-400";
 }
 
@@ -92,8 +94,8 @@ function ScoreRow({
           {value ?? "—"}
         </span>
       </div>
-      <div className="flex gap-1">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+      <div className="flex gap-1.5">
+        {Array.from({ length: 6 }, (_, i) => i).map((n) => (
           <button
             key={n}
             onClick={() => onChange(n)}
