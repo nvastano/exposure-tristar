@@ -26,6 +26,8 @@ type Player = {
   pos: string[];
   notes: string;
   scores: Scores;
+  exitVelo: string;
+  throwVelo: string;
 };
 
 function emptyScores(): Scores {
@@ -124,6 +126,8 @@ function ScoringModal({
   onClose: () => void;
 }) {
   const [scores, setScores] = useState<Scores>({ ...player.scores });
+  const [exitVelo, setExitVelo] = useState(player.exitVelo);
+  const [throwVelo, setThrowVelo] = useState(player.throwVelo);
   const [notes, setNotes] = useState(player.notes);
 
   function setScore(key: CategoryKey, val: number) {
@@ -171,6 +175,44 @@ function ScoringModal({
             </div>
           ))}
 
+          <div className="border-t border-white/10 pt-4 flex flex-col gap-3">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Velocity</p>
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Exit Velo</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={exitVelo}
+                    onChange={(e) => setExitVelo(e.target.value)}
+                    placeholder="0"
+                    min={0}
+                    max={130}
+                    inputMode="numeric"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 pr-12 text-lg font-black text-white placeholder-white/20 focus:outline-none focus:border-white/30 tabular-nums"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white/30">mph</span>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Throw Velo</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={throwVelo}
+                    onChange={(e) => setThrowVelo(e.target.value)}
+                    placeholder="0"
+                    min={0}
+                    max={110}
+                    inputMode="numeric"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 pr-12 text-lg font-black text-white placeholder-white/20 focus:outline-none focus:border-white/30 tabular-nums"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-white/30">mph</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1.5 pt-1">
             <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">Notes</label>
             <textarea
@@ -192,7 +234,7 @@ function ScoringModal({
             Cancel
           </button>
           <button
-            onClick={() => onSave({ ...player, scores, notes })}
+            onClick={() => onSave({ ...player, scores, exitVelo, throwVelo, notes })}
             className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors"
           >
             Save Scores
@@ -238,6 +280,11 @@ function PlayerCard({
         {(player.pos.length > 0 || player.age) && (
           <p className="text-xs text-white/30">{[player.pos.join("/"), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}</p>
         )}
+        {(player.exitVelo || player.throwVelo) && (
+          <p className="text-xs text-white/30 tabular-nums">
+            {[player.exitVelo ? `EV ${player.exitVelo}` : "", player.throwVelo ? `TV ${player.throwVelo}` : ""].filter(Boolean).join(" · ")}
+          </p>
+        )}
       </div>
     </button>
   );
@@ -254,7 +301,7 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: Date.now(), name: n, age, pos, notes: "", scores: emptyScores() });
+    onAdd({ id: Date.now(), name: n, age, pos, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
     setName("");
     setAge("");
     setPos([]);
