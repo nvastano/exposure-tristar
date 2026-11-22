@@ -504,8 +504,8 @@ export default function TryoutPage() {
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     Promise.all([
-      sheetsGet("tryoutPlayers", { date: today }),
-      sheetsGet("tryoutEntries", { date: today }),
+      sheetsGet("tryoutPlayers"),
+      sheetsGet("tryoutEntries"),
     ])
       .then(([playerRows, entryRows]: [Record<string, string>[], Record<string, string>[]]) => {
         // Group entries by TryoutSheetId; average each score category across all coaches
