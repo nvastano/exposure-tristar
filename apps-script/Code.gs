@@ -1211,7 +1211,7 @@ function doPost(e) {
     result = { ok: true };
   } else if (body.action === "saveTryoutPlayer") {
     var trySheet = getSheet_(TRYOUTS_SHEET, [
-      "Id","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","Positions",
+      "Id","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
       "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
       "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
       "ExitVelo","ThrowVelo","Notes"
@@ -1224,6 +1224,9 @@ function doPost(e) {
       Age: body.age || "",
       Bats: body.bats || "",
       Throws: body.throws || "",
+      PrevTeam: body.prevTeam || "",
+      City: body.city || "",
+      Coach: body.coach || "",
       Positions: body.positions || "",
       Effort: body.effort !== undefined ? body.effort : "",
       Attitude: body.attitude !== undefined ? body.attitude : "",
