@@ -1264,6 +1264,7 @@ function doPost(e) {
     } else {
       var utUpdates = { UpdatedAt: new Date().toISOString() };
       ensureColumn_(utSheet, "UpdatedAt");
+      if (body.coach !== undefined) utUpdates.Coach = body.coach;
       if (body.effort !== undefined) utUpdates.Effort = body.effort;
       if (body.attitude !== undefined) utUpdates.Attitude = body.attitude;
       if (body.recovery !== undefined) utUpdates.Recovery = body.recovery;

@@ -137,6 +137,7 @@ function ScoringModal({
   const [exitVelo, setExitVelo] = useState(player.exitVelo);
   const [throwVelo, setThrowVelo] = useState(player.throwVelo);
   const [notes, setNotes] = useState(player.notes);
+  const [coach, setCoach] = useState(player.coach);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -179,6 +180,33 @@ function ScoringModal({
 
         {/* Scroll area */}
         <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
+          {/* Coach picker */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Evaluating Coach</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {COACHES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCoach(coach === c ? "" : c)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+                    coach === c ? "bg-white text-black" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+              <input
+                type="text"
+                value={COACHES.includes(coach as typeof COACHES[number]) ? "" : coach}
+                onChange={(e) => setCoach(e.target.value)}
+                placeholder="Other…"
+                className="flex-1 min-w-[80px] bg-white/10 border border-white/10 rounded-md px-2 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+              />
+            </div>
+          </div>
+          <div className="border-t border-white/5" />
+
           {CATEGORIES.map((cat, i) => (
             <div key={cat.key}>
               <ScoreRow
@@ -256,10 +284,11 @@ function ScoringModal({
               onClick={async () => {
                 setSaveError(null);
                 setSaving(true);
-                const updated = { ...player, scores, exitVelo, throwVelo, notes };
+                const updated = { ...player, scores, exitVelo, throwVelo, notes, coach };
                 try {
                   await sheetsPost("updateTryoutPlayer", {
                     sheetId: String(updated.id),
+                    coach: updated.coach,
                     ...Object.fromEntries(CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])),
                     exitVelo: updated.exitVelo,
                     throwVelo: updated.throwVelo,
@@ -373,7 +402,6 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
   const [throws, setThrows] = useState("");
   const [prevTeam, setPrevTeam] = useState("");
   const [city, setCity] = useState("");
-  const [coach, setCoach] = useState("");
   const [pos, setPos] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -381,14 +409,13 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, prevTeam, city, coach, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
+    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, prevTeam, city, coach: "", notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
     setName("");
     setAge("");
     setBats("");
     setThrows("");
     setPrevTeam("");
     setCity("");
-    setCoach("");
     setPos([]);
   }
 
@@ -442,30 +469,6 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
           placeholder="City"
           className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Evaluating Coach</span>
-        <div className="flex gap-1.5 flex-wrap">
-          {COACHES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setCoach(coach === c ? "" : c)}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                coach === c ? "bg-white text-black" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-          <input
-            type="text"
-            value={COACHES.includes(coach as typeof COACHES[number]) ? "" : coach}
-            onChange={(e) => setCoach(e.target.value)}
-            placeholder="Other…"
-            className="flex-1 min-w-[80px] bg-white/10 border border-white/10 rounded-md px-2 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/30"
-          />
-        </div>
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Positions</span>
