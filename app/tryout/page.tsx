@@ -258,19 +258,9 @@ function ScoringModal({
                 setSaving(true);
                 const updated = { ...player, scores, exitVelo, throwVelo, notes };
                 try {
-                  await sheetsPost("saveTryoutPlayer", {
-                    playerName: updated.name,
-                    age: updated.age,
-                    bats: updated.bats,
-                    throws: updated.throws,
-                    prevTeam: updated.prevTeam,
-                    city: updated.city,
-                    coach: updated.coach,
-                    positions: updated.pos.join(", "),
-                    tryoutDate: new Date().toISOString().slice(0, 10),
-                    ...Object.fromEntries(
-                      CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])
-                    ),
+                  await sheetsPost("updateTryoutPlayer", {
+                    sheetId: String(updated.id),
+                    ...Object.fromEntries(CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])),
                     exitVelo: updated.exitVelo,
                     throwVelo: updated.throwVelo,
                     notes: updated.notes,
@@ -505,8 +495,32 @@ export default function TryoutPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [scoring, setScoring] = useState<Player | null>(null);
 
-  function addPlayer(p: Player) {
+  function playerPayload(p: Player) {
+    return {
+      sheetId: String(p.id),
+      playerName: p.name,
+      age: p.age,
+      bats: p.bats,
+      throws: p.throws,
+      prevTeam: p.prevTeam,
+      city: p.city,
+      coach: p.coach,
+      positions: p.pos.join(", "),
+      tryoutDate: new Date().toISOString().slice(0, 10),
+      ...Object.fromEntries(CATEGORIES.map((c) => [c.key, p.scores[c.key] ?? ""])),
+      exitVelo: p.exitVelo,
+      throwVelo: p.throwVelo,
+      notes: p.notes,
+    };
+  }
+
+  async function addPlayer(p: Player) {
     setPlayers((prev) => [...prev, p]);
+    try {
+      await sheetsPost("saveTryoutPlayer", playerPayload(p));
+    } catch {
+      // silent — player is added locally regardless
+    }
   }
 
   function saveScores(updated: Player) {

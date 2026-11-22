@@ -1211,13 +1211,14 @@ function doPost(e) {
     result = { ok: true };
   } else if (body.action === "saveTryoutPlayer") {
     var trySheet = getSheet_(TRYOUTS_SHEET, [
-      "Id","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
+      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
       "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
       "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
       "ExitVelo","ThrowVelo","Notes"
     ]);
     appendRowByHeaders_(trySheet, {
       Id: newId_(),
+      SheetId: body.sheetId || "",
       SavedAt: new Date().toISOString(),
       TryoutDate: body.tryoutDate || new Date().toISOString().slice(0, 10),
       PlayerName: body.playerName || "",
@@ -1242,6 +1243,42 @@ function doPost(e) {
       Notes: body.notes || "",
     });
     result = { ok: true };
+  } else if (body.action === "updateTryoutPlayer") {
+    var utSheet = getSheet_(TRYOUTS_SHEET, [
+      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
+      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
+      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
+      "ExitVelo","ThrowVelo","Notes"
+    ]);
+    var utSheetIdCol = ensureColumn_(utSheet, "SheetId");
+    var utData = utSheet.getDataRange().getValues();
+    var utRow = -1;
+    for (var uti = 1; uti < utData.length; uti++) {
+      if (String(utData[uti][utSheetIdCol - 1]) === String(body.sheetId)) {
+        utRow = uti + 1;
+        break;
+      }
+    }
+    if (utRow === -1) {
+      result = { error: "tryout player not found" };
+    } else {
+      var utUpdates = { UpdatedAt: new Date().toISOString() };
+      ensureColumn_(utSheet, "UpdatedAt");
+      if (body.effort !== undefined) utUpdates.Effort = body.effort;
+      if (body.attitude !== undefined) utUpdates.Attitude = body.attitude;
+      if (body.recovery !== undefined) utUpdates.Recovery = body.recovery;
+      if (body.parentConvo !== undefined) utUpdates.ParentConvo = body.parentConvo;
+      if (body.takingCorrection !== undefined) utUpdates.TakingCorrection = body.takingCorrection;
+      if (body.swing !== undefined) utUpdates.Swing = body.swing;
+      if (body.fieldingMechanics !== undefined) utUpdates.FieldingMechanics = body.fieldingMechanics;
+      if (body.personalAppearance !== undefined) utUpdates.PersonalAppearance = body.personalAppearance;
+      if (body.arrivalTime !== undefined) utUpdates.ArrivalTime = body.arrivalTime;
+      if (body.exitVelo !== undefined) utUpdates.ExitVelo = body.exitVelo;
+      if (body.throwVelo !== undefined) utUpdates.ThrowVelo = body.throwVelo;
+      if (body.notes !== undefined) utUpdates.Notes = body.notes;
+      setRowByHeaders_(utSheet, utRow, utUpdates);
+      result = { ok: true };
+    }
   } else if (body.action === "logFundraiserSale") {
     var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
     backfillIds_(fsSheet);
