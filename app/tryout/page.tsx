@@ -99,12 +99,12 @@ function ScoreRow({
           {value ?? "—"}
         </span>
       </div>
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-6 gap-1.5">
         {Array.from({ length: 6 }, (_, i) => i).map((n) => (
           <button
             key={n}
             onClick={() => onChange(n)}
-            className={`flex-1 rounded py-1.5 text-xs font-bold transition-colors ${
+            className={`rounded py-1.5 text-xs font-bold transition-colors ${
               value === n
                 ? "bg-white text-black"
                 : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
@@ -144,10 +144,10 @@ function ScoringModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 overflow-hidden"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full sm:max-w-lg bg-zinc-900 border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92dvh]">
+      <div className="w-full sm:max-w-lg bg-zinc-900 border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92dvh] min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
           <div>
