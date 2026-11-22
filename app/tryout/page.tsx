@@ -286,8 +286,9 @@ function ScoringModal({
                 setSaving(true);
                 const updated = { ...player, scores, exitVelo, throwVelo, notes, coach };
                 try {
-                  await sheetsPost("updateTryoutPlayer", {
-                    sheetId: String(updated.id),
+                  await sheetsPost("saveTryoutEntry", {
+                    tryoutSheetId: String(updated.id),
+                    tryoutDate: new Date().toISOString().slice(0, 10),
                     coach: updated.coach,
                     ...Object.fromEntries(CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])),
                     exitVelo: updated.exitVelo,
@@ -502,34 +503,52 @@ export default function TryoutPage() {
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    sheetsGet("tryoutPlayers", { date: today })
-      .then((rows: Record<string, string>[]) => {
+    Promise.all([
+      sheetsGet("tryoutPlayers", { date: today }),
+      sheetsGet("tryoutEntries", { date: today }),
+    ])
+      .then(([playerRows, entryRows]: [Record<string, string>[], Record<string, string>[]]) => {
+        // Group entries by TryoutSheetId; average each score category across all coaches
+        const entriesByPlayer: Record<string, Record<string, string>[]> = {};
+        for (const e of entryRows) {
+          const key = String(e.TryoutSheetId);
+          if (!entriesByPlayer[key]) entriesByPlayer[key] = [];
+          entriesByPlayer[key].push(e);
+        }
+        function avgEntries(entries: Record<string, string>[], key: string): number | undefined {
+          const vals = entries.map((e) => e[key]).filter((v) => v !== "" && v != null).map(Number).filter((n) => !isNaN(n));
+          return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
+        }
         setPlayers(
-          rows.map((r) => ({
-            id: Number(r.SheetId) || Date.now(),
-            name: r.PlayerName || "",
-            age: r.Age || "",
-            bats: r.Bats || "",
-            throws: r.Throws || "",
-            pos: r.Positions ? r.Positions.split(",").map((s) => s.trim()).filter(Boolean) : [],
-            prevTeam: r.PrevTeam || "",
-            city: r.City || "",
-            coach: r.Coach || "",
-            notes: r.Notes || "",
-            exitVelo: r.ExitVelo || "",
-            throwVelo: r.ThrowVelo || "",
-            scores: {
-              effort:            r.Effort !== "" && r.Effort != null ? Number(r.Effort) : undefined,
-              attitude:          r.Attitude !== "" && r.Attitude != null ? Number(r.Attitude) : undefined,
-              recovery:          r.Recovery !== "" && r.Recovery != null ? Number(r.Recovery) : undefined,
-              parentConvo:       r.ParentConvo !== "" && r.ParentConvo != null ? Number(r.ParentConvo) : undefined,
-              takingCorrection:  r.TakingCorrection !== "" && r.TakingCorrection != null ? Number(r.TakingCorrection) : undefined,
-              swing:             r.Swing !== "" && r.Swing != null ? Number(r.Swing) : undefined,
-              fieldingMechanics: r.FieldingMechanics !== "" && r.FieldingMechanics != null ? Number(r.FieldingMechanics) : undefined,
-              personalAppearance:r.PersonalAppearance !== "" && r.PersonalAppearance != null ? Number(r.PersonalAppearance) : undefined,
-              arrivalTime:       r.ArrivalTime !== "" && r.ArrivalTime != null ? Number(r.ArrivalTime) : undefined,
-            },
-          }))
+          playerRows.map((r) => {
+            const sheetId = String(r.SheetId);
+            const entries = entriesByPlayer[sheetId] || [];
+            return {
+              id: Number(r.SheetId) || Date.now(),
+              name: r.PlayerName || "",
+              age: r.Age || "",
+              bats: r.Bats || "",
+              throws: r.Throws || "",
+              pos: r.Positions ? r.Positions.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+              prevTeam: r.PrevTeam || "",
+              city: r.City || "",
+              coach: "",
+              notes: entries[0]?.Notes || "",
+              exitVelo: entries[0]?.ExitVelo || "",
+              throwVelo: entries[0]?.ThrowVelo || "",
+              scores: {
+                effort:            avgEntries(entries, "Effort"),
+                attitude:          avgEntries(entries, "Attitude"),
+                recovery:          avgEntries(entries, "Recovery"),
+                parentConvo:       avgEntries(entries, "ParentConvo"),
+                takingCorrection:  avgEntries(entries, "TakingCorrection"),
+                swing:             avgEntries(entries, "Swing"),
+                fieldingMechanics: avgEntries(entries, "FieldingMechanics"),
+                personalAppearance:avgEntries(entries, "PersonalAppearance"),
+                arrivalTime:       avgEntries(entries, "ArrivalTime"),
+              },
+            };
+          })
         );
       })
       .catch(() => setLoadError("Couldn't load players from sheet."))
@@ -545,13 +564,8 @@ export default function TryoutPage() {
       throws: p.throws,
       prevTeam: p.prevTeam,
       city: p.city,
-      coach: p.coach,
       positions: p.pos.join(", "),
       tryoutDate: new Date().toISOString().slice(0, 10),
-      ...Object.fromEntries(CATEGORIES.map((c) => [c.key, p.scores[c.key] ?? ""])),
-      exitVelo: p.exitVelo,
-      throwVelo: p.throwVelo,
-      notes: p.notes,
     };
   }
 
