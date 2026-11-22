@@ -1,7 +1,7 @@
 const SESSION_PREFIX = "playerUnlocked_";
 
 // Set to true to start enforcing PINs. Currently false — all players pass.
-export const PLAYER_PINS_ENFORCED = false;
+export const PLAYER_PINS_ENFORCED = true;
 
 export function isPlayerUnlocked(playerId: string): boolean {
   if (typeof window === "undefined") return false;
