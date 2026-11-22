@@ -28,6 +28,7 @@ var ASSIGNMENT_TEMPLATES_SHEET = "AssignmentTemplates";
 var ASSIGNMENTS_SHEET = "Assignments";
 var PRACTICE_SESSIONS_SHEET = "PracticeSessions";
 var PRACTICE_ATTENDANCE_SHEET = "PracticeAttendance";
+var TRYOUTS_SHEET = "Tryouts";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -1206,6 +1207,36 @@ function doPost(e) {
         Reason: rec.reason || "",
         CreatedAt: new Date().toISOString(),
       });
+    });
+    result = { ok: true };
+  } else if (body.action === "saveTryoutPlayer") {
+    var trySheet = getSheet_(TRYOUTS_SHEET, [
+      "Id","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","Positions",
+      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
+      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
+      "ExitVelo","ThrowVelo","Notes"
+    ]);
+    appendRowByHeaders_(trySheet, {
+      Id: newId_(),
+      SavedAt: new Date().toISOString(),
+      TryoutDate: body.tryoutDate || new Date().toISOString().slice(0, 10),
+      PlayerName: body.playerName || "",
+      Age: body.age || "",
+      Bats: body.bats || "",
+      Throws: body.throws || "",
+      Positions: body.positions || "",
+      Effort: body.effort !== undefined ? body.effort : "",
+      Attitude: body.attitude !== undefined ? body.attitude : "",
+      Recovery: body.recovery !== undefined ? body.recovery : "",
+      ParentConvo: body.parentConvo !== undefined ? body.parentConvo : "",
+      TakingCorrection: body.takingCorrection !== undefined ? body.takingCorrection : "",
+      Swing: body.swing !== undefined ? body.swing : "",
+      FieldingMechanics: body.fieldingMechanics !== undefined ? body.fieldingMechanics : "",
+      PersonalAppearance: body.personalAppearance !== undefined ? body.personalAppearance : "",
+      ArrivalTime: body.arrivalTime !== undefined ? body.arrivalTime : "",
+      ExitVelo: body.exitVelo || "",
+      ThrowVelo: body.throwVelo || "",
+      Notes: body.notes || "",
     });
     result = { ok: true };
   } else if (body.action === "logFundraiserSale") {

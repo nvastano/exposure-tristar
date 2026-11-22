@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sheetsPost } from "@/lib/sheets";
 
 const POSITIONS = ["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"] as const;
 
@@ -23,6 +24,8 @@ type Player = {
   id: number;
   name: string;
   age: string;
+  bats: string;
+  throws: string;
   pos: string[];
   notes: string;
   scores: Scores;
@@ -96,12 +99,12 @@ function ScoreRow({
           {value ?? "—"}
         </span>
       </div>
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-6 gap-1.5">
         {Array.from({ length: 6 }, (_, i) => i).map((n) => (
           <button
             key={n}
             onClick={() => onChange(n)}
-            className={`flex-1 rounded py-1.5 text-xs font-bold transition-colors ${
+            className={`rounded py-1.5 text-xs font-bold transition-colors ${
               value === n
                 ? "bg-white text-black"
                 : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
@@ -129,6 +132,8 @@ function ScoringModal({
   const [exitVelo, setExitVelo] = useState(player.exitVelo);
   const [throwVelo, setThrowVelo] = useState(player.throwVelo);
   const [notes, setNotes] = useState(player.notes);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function setScore(key: CategoryKey, val: number) {
     setScores((prev) => ({ ...prev, [key]: val }));
@@ -139,18 +144,23 @@ function ScoringModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 overflow-hidden"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full sm:max-w-lg bg-zinc-900 border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92dvh]">
+      <div className="w-full sm:max-w-lg bg-zinc-900 border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92dvh] min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
           <div>
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Scoring</p>
             <h2 className="text-xl font-black">{player.name}</h2>
-            {(player.age || player.pos.length > 0) && (
+            {(player.age || player.pos.length > 0 || player.bats || player.throws) && (
               <p className="text-xs text-white/40 mt-0.5">
-                {[player.age ? `Age ${player.age}` : "", player.pos.join("/")].filter(Boolean).join(" · ")}
+                {[
+                  player.age ? `Age ${player.age}` : "",
+                  player.pos.join("/"),
+                  player.bats ? `B:${player.bats}` : "",
+                  player.throws ? `T:${player.throws}` : "",
+                ].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -226,19 +236,49 @@ function ScoringModal({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-white/10 px-5 py-4 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave({ ...player, scores, exitVelo, throwVelo, notes })}
-            className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors"
-          >
-            Save Scores
-          </button>
+        <div className="shrink-0 border-t border-white/10 px-5 py-4 flex flex-col gap-2">
+          {saveError && <p className="text-red-400 text-xs text-center">{saveError}</p>}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 py-3 rounded-xl border border-white/15 text-white/60 font-bold text-sm hover:bg-white/5 transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaveError(null);
+                setSaving(true);
+                const updated = { ...player, scores, exitVelo, throwVelo, notes };
+                try {
+                  await sheetsPost("saveTryoutPlayer", {
+                    playerName: updated.name,
+                    age: updated.age,
+                    bats: updated.bats,
+                    throws: updated.throws,
+                    positions: updated.pos.join(", "),
+                    tryoutDate: new Date().toISOString().slice(0, 10),
+                    ...Object.fromEntries(
+                      CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])
+                    ),
+                    exitVelo: updated.exitVelo,
+                    throwVelo: updated.throwVelo,
+                    notes: updated.notes,
+                  });
+                } catch {
+                  setSaveError("Sheet save failed — scores kept locally.");
+                } finally {
+                  setSaving(false);
+                  onSave(updated);
+                }
+              }}
+              className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Save Scores"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -275,6 +315,11 @@ function PlayerCard({
             {[player.pos.join(" / "), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}
           </p>
         )}
+        {(player.bats || player.throws) && (
+          <p className="text-xs text-white/30 mt-0.5">
+            {[player.bats ? `B: ${player.bats}` : "", player.throws ? `T: ${player.throws}` : ""].filter(Boolean).join("  ")}
+          </p>
+        )}
         {(player.exitVelo || player.throwVelo) && (
           <p className="text-xs text-white/30 tabular-nums mt-0.5">
             {[player.exitVelo ? `EV ${player.exitVelo} mph` : "", player.throwVelo ? `TV ${player.throwVelo} mph` : ""].filter(Boolean).join(" · ")}
@@ -291,10 +336,43 @@ function PlayerCard({
   );
 }
 
+// ── Hand picker ───────────────────────────────────────────────────
+function HandPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 flex-1">
+      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{label}</span>
+      <div className="flex gap-1.5">
+        {["R", "L", "S"].map((h) => (
+          <button
+            key={h}
+            type="button"
+            onClick={() => onChange(value === h ? "" : h)}
+            className={`flex-1 py-1.5 rounded-md text-xs font-black transition-colors ${
+              value === h ? "bg-white text-black" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+            }`}
+          >
+            {h === "R" ? "Right" : h === "L" ? "Left" : "Switch"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Add player form ───────────────────────────────────────────────
 function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
+  const [bats, setBats] = useState("");
+  const [throws, setThrows] = useState("");
   const [pos, setPos] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -302,9 +380,11 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: Date.now(), name: n, age, pos, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
+    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
     setName("");
     setAge("");
+    setBats("");
+    setThrows("");
     setPos([]);
   }
 
@@ -339,6 +419,10 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
         max={18}
         className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
       />
+      <div className="flex gap-3">
+        <HandPicker label="Bats" value={bats} onChange={setBats} />
+        <HandPicker label="Throws" value={throws} onChange={setThrows} />
+      </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Positions</span>
         <PositionPicker selected={pos} onChange={setPos} />
