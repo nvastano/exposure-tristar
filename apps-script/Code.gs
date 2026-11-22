@@ -29,6 +29,7 @@ var ASSIGNMENTS_SHEET = "Assignments";
 var PRACTICE_SESSIONS_SHEET = "PracticeSessions";
 var PRACTICE_ATTENDANCE_SHEET = "PracticeAttendance";
 var TRYOUTS_SHEET = "Tryouts";
+var TRYOUT_ENTRIES_SHEET = "TryoutEntries";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
@@ -419,10 +420,7 @@ function doGet(e) {
     result = rowsToObjects_(paSheet.getDataRange().getValues());
   } else if (action === "tryoutPlayers") {
     var tpSheet = getSheet_(TRYOUTS_SHEET, [
-      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
-      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
-      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
-      "ExitVelo","ThrowVelo","Notes"
+      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Positions"
     ]);
     var tpDate = e.parameter.date || "";
     var tpAll = rowsToObjects_(tpSheet.getDataRange().getValues());
@@ -430,6 +428,19 @@ function doGet(e) {
       tpAll = tpAll.filter(function(r) { return String(r.TryoutDate) === tpDate; });
     }
     result = tpAll;
+  } else if (action === "tryoutEntries") {
+    var teSheet = getSheet_(TRYOUT_ENTRIES_SHEET, [
+      "Id","TryoutSheetId","TryoutDate","Coach","SavedAt",
+      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
+      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
+      "ExitVelo","ThrowVelo","Notes"
+    ]);
+    var teDate = e.parameter.date || "";
+    var teAll = rowsToObjects_(teSheet.getDataRange().getValues());
+    if (teDate) {
+      teAll = teAll.filter(function(r) { return String(r.TryoutDate) === teDate; });
+    }
+    result = teAll;
   } else if (action === "homework") {
     var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
     var hwData = hwSheet.getDataRange().getValues();
@@ -1224,10 +1235,7 @@ function doPost(e) {
     result = { ok: true };
   } else if (body.action === "saveTryoutPlayer") {
     var trySheet = getSheet_(TRYOUTS_SHEET, [
-      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
-      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
-      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
-      "ExitVelo","ThrowVelo","Notes"
+      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Positions"
     ]);
     appendRowByHeaders_(trySheet, {
       Id: newId_(),
@@ -1240,59 +1248,69 @@ function doPost(e) {
       Throws: body.throws || "",
       PrevTeam: body.prevTeam || "",
       City: body.city || "",
-      Coach: body.coach || "",
       Positions: body.positions || "",
-      Effort: body.effort !== undefined ? body.effort : "",
-      Attitude: body.attitude !== undefined ? body.attitude : "",
-      Recovery: body.recovery !== undefined ? body.recovery : "",
-      ParentConvo: body.parentConvo !== undefined ? body.parentConvo : "",
-      TakingCorrection: body.takingCorrection !== undefined ? body.takingCorrection : "",
-      Swing: body.swing !== undefined ? body.swing : "",
-      FieldingMechanics: body.fieldingMechanics !== undefined ? body.fieldingMechanics : "",
-      PersonalAppearance: body.personalAppearance !== undefined ? body.personalAppearance : "",
-      ArrivalTime: body.arrivalTime !== undefined ? body.arrivalTime : "",
-      ExitVelo: body.exitVelo || "",
-      ThrowVelo: body.throwVelo || "",
-      Notes: body.notes || "",
     });
     result = { ok: true };
-  } else if (body.action === "updateTryoutPlayer") {
-    var utSheet = getSheet_(TRYOUTS_SHEET, [
-      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
+  } else if (body.action === "saveTryoutEntry") {
+    // Upsert: one row per coach per player. Find existing row by TryoutSheetId + Coach and update,
+    // or append a new row if none exists.
+    var teSheet = getSheet_(TRYOUT_ENTRIES_SHEET, [
+      "Id","TryoutSheetId","TryoutDate","Coach","SavedAt",
       "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
       "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
       "ExitVelo","ThrowVelo","Notes"
     ]);
-    var utSheetIdCol = ensureColumn_(utSheet, "SheetId");
-    var utData = utSheet.getDataRange().getValues();
-    var utRow = -1;
-    for (var uti = 1; uti < utData.length; uti++) {
-      if (String(utData[uti][utSheetIdCol - 1]) === String(body.sheetId)) {
-        utRow = uti + 1;
+    var teIdCol = ensureColumn_(teSheet, "TryoutSheetId");
+    var teCoachCol = ensureColumn_(teSheet, "Coach");
+    var teData = teSheet.getDataRange().getValues();
+    var teRow = -1;
+    for (var tei = 1; tei < teData.length; tei++) {
+      if (
+        String(teData[tei][teIdCol - 1]) === String(body.tryoutSheetId) &&
+        String(teData[tei][teCoachCol - 1]) === String(body.coach || "")
+      ) {
+        teRow = tei + 1;
         break;
       }
     }
-    if (utRow === -1) {
-      result = { error: "tryout player not found" };
+    if (teRow === -1) {
+      appendRowByHeaders_(teSheet, {
+        Id: newId_(),
+        TryoutSheetId: body.tryoutSheetId || "",
+        TryoutDate: body.tryoutDate || new Date().toISOString().slice(0, 10),
+        Coach: body.coach || "",
+        SavedAt: new Date().toISOString(),
+        Effort: body.effort !== undefined ? body.effort : "",
+        Attitude: body.attitude !== undefined ? body.attitude : "",
+        Recovery: body.recovery !== undefined ? body.recovery : "",
+        ParentConvo: body.parentConvo !== undefined ? body.parentConvo : "",
+        TakingCorrection: body.takingCorrection !== undefined ? body.takingCorrection : "",
+        Swing: body.swing !== undefined ? body.swing : "",
+        FieldingMechanics: body.fieldingMechanics !== undefined ? body.fieldingMechanics : "",
+        PersonalAppearance: body.personalAppearance !== undefined ? body.personalAppearance : "",
+        ArrivalTime: body.arrivalTime !== undefined ? body.arrivalTime : "",
+        ExitVelo: body.exitVelo || "",
+        ThrowVelo: body.throwVelo || "",
+        Notes: body.notes || "",
+      });
     } else {
-      var utUpdates = { UpdatedAt: new Date().toISOString() };
-      ensureColumn_(utSheet, "UpdatedAt");
-      if (body.coach !== undefined) utUpdates.Coach = body.coach;
-      if (body.effort !== undefined) utUpdates.Effort = body.effort;
-      if (body.attitude !== undefined) utUpdates.Attitude = body.attitude;
-      if (body.recovery !== undefined) utUpdates.Recovery = body.recovery;
-      if (body.parentConvo !== undefined) utUpdates.ParentConvo = body.parentConvo;
-      if (body.takingCorrection !== undefined) utUpdates.TakingCorrection = body.takingCorrection;
-      if (body.swing !== undefined) utUpdates.Swing = body.swing;
-      if (body.fieldingMechanics !== undefined) utUpdates.FieldingMechanics = body.fieldingMechanics;
-      if (body.personalAppearance !== undefined) utUpdates.PersonalAppearance = body.personalAppearance;
-      if (body.arrivalTime !== undefined) utUpdates.ArrivalTime = body.arrivalTime;
-      if (body.exitVelo !== undefined) utUpdates.ExitVelo = body.exitVelo;
-      if (body.throwVelo !== undefined) utUpdates.ThrowVelo = body.throwVelo;
-      if (body.notes !== undefined) utUpdates.Notes = body.notes;
-      setRowByHeaders_(utSheet, utRow, utUpdates);
-      result = { ok: true };
+      var teUpdates = { SavedAt: new Date().toISOString() };
+      if (body.coach !== undefined) teUpdates.Coach = body.coach;
+      if (body.effort !== undefined) teUpdates.Effort = body.effort;
+      if (body.attitude !== undefined) teUpdates.Attitude = body.attitude;
+      if (body.recovery !== undefined) teUpdates.Recovery = body.recovery;
+      if (body.parentConvo !== undefined) teUpdates.ParentConvo = body.parentConvo;
+      if (body.takingCorrection !== undefined) teUpdates.TakingCorrection = body.takingCorrection;
+      if (body.swing !== undefined) teUpdates.Swing = body.swing;
+      if (body.fieldingMechanics !== undefined) teUpdates.FieldingMechanics = body.fieldingMechanics;
+      if (body.personalAppearance !== undefined) teUpdates.PersonalAppearance = body.personalAppearance;
+      if (body.arrivalTime !== undefined) teUpdates.ArrivalTime = body.arrivalTime;
+      if (body.exitVelo !== undefined) teUpdates.ExitVelo = body.exitVelo;
+      if (body.throwVelo !== undefined) teUpdates.ThrowVelo = body.throwVelo;
+      if (body.notes !== undefined) teUpdates.Notes = body.notes;
+      setRowByHeaders_(teSheet, teRow, teUpdates);
     }
+    result = { ok: true };
   } else if (body.action === "logFundraiserSale") {
     var fsSheet = getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]);
     backfillIds_(fsSheet);
