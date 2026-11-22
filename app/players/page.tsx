@@ -14,8 +14,9 @@ import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import AssignedWorkPlayer from "@/components/AssignedWorkPlayer";
+import PlayerPinGate from "@/components/PlayerPinGate";
 
-type PlayerRow = { Id: string; Name: string; Number?: string };
+type PlayerRow = { Id: string; Name: string; Number?: string; Pin?: string };
 type PlayerProfile = {
   Player: string; DOB: string; HeightFt: string; HeightIn: string; Weight: string;
   Throws: string; Bats: string; OverhandSpeed: string; Number: string;
@@ -285,6 +286,11 @@ function PlayerContent() {
   }
 
   return (
+    <PlayerPinGate
+      playerId={player?.Id ?? playerName}
+      playerName={playerName}
+      storedPin={player?.Pin ?? ""}
+    >
     <div className="flex flex-col gap-8">
       <div>
         <Link href="/players" className="text-white/40 hover:text-accent text-sm mb-3 inline-block">
@@ -431,6 +437,7 @@ function PlayerContent() {
       )}
 
     </div>
+    </PlayerPinGate>
   );
 }
 

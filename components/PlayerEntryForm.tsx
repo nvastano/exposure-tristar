@@ -6,11 +6,12 @@ import { METRIC_CATEGORIES, METRIC_DEFS } from "@/lib/metrics";
 import { localDateStr } from "@/lib/stats";
 import { getRandomQuestion } from "@/lib/trivia";
 import TriviaQuestionCard from "@/components/TriviaQuestion";
+import PlayerPinGate from "@/components/PlayerPinGate";
 
 const TODAY = localDateStr();
 const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-type PlayerRow = { Name: string };
+type PlayerRow = { Name: string; Id?: string; Pin?: string };
 type DrillRow = { Id: string; Name: string };
 type Task = { text: string; videoUrl?: string; day?: string };
 type Template = { Id: string; Name: string; Tasks: Task[] };
@@ -30,6 +31,7 @@ function dayOfWeek(dateStr: string): string {
 
 export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [players, setPlayers] = useState<string[]>([]);
+  const [playerRows, setPlayerRows] = useState<PlayerRow[]>([]);
   const [player, setPlayer] = useState("");
   const [date, setDate] = useState(TODAY);
   const [metricValues, setMetricValues] = useState<Record<string, string | boolean>>({});
@@ -75,6 +77,7 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
     (async () => {
       try {
         const data = (await sheetsGet("players")) as PlayerRow[];
+        setPlayerRows(data);
         setPlayers(data.map((p) => p.Name).filter(Boolean).sort((a, b) => a.localeCompare(b)));
       } catch {
         // sheet not connected yet
@@ -179,9 +182,15 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
         </select>
       </label>
 
-      {player && (
-        <TriviaQuestionCard question={triviaQuestion} player={player} />
-      )}
+      {player && (() => {
+        const row = playerRows.find((r) => r.Name === player);
+        return (
+          <PlayerPinGate
+            playerId={row?.Id ?? player}
+            playerName={player}
+            storedPin={row?.Pin ?? ""}
+          >
+            <TriviaQuestionCard question={triviaQuestion} player={player} />
 
       <label className="flex flex-col gap-1 text-sm w-48">
         Date
@@ -321,6 +330,9 @@ export default function PlayerEntryForm({ onSaved }: { onSaved?: () => void }) {
       </button>
 
       {status && <p className="text-sm text-white/70">{status}</p>}
+          </PlayerPinGate>
+        );
+      })()}
     </div>
   );
 }
