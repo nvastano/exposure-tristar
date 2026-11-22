@@ -20,6 +20,8 @@ export function lockPlayer(playerId: string): void {
 }
 
 export function checkPlayerPin(pin: string, storedPin: string): boolean {
-  if (!pin || !storedPin) return false;
-  return pin.trim() === storedPin.trim();
+  const p = String(pin ?? "").trim();
+  const s = String(storedPin ?? "").trim();
+  if (!p || !s) return false;
+  return p === s;
 }

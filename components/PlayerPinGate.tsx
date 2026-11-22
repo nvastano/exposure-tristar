@@ -15,6 +15,7 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [showPin, setShowPin] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setUnlocked(isPlayerUnlocked(playerId));
@@ -24,18 +25,28 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
   if (!PLAYER_PINS_ENFORCED) return <>{children}</>;
 
   // No PIN set for this player — still open
-  if (!storedPin) return <>{children}</>;
+  if (!String(storedPin ?? "").trim()) return <>{children}</>;
 
   if (unlocked) return <>{children}</>;
 
-  function handleSubmit() {
-    if (checkPlayerPin(pin, storedPin)) {
-      unlockPlayer(playerId);
-      setUnlocked(true);
-      setError(false);
-      setPin("");
-    } else {
+  async function handleSubmit() {
+    if (loading) return;
+    setLoading(true);
+    setError(false);
+    // Brief delay so the loading state is visible
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      if (checkPlayerPin(pin, storedPin)) {
+        unlockPlayer(playerId);
+        setUnlocked(true);
+        setPin("");
+      } else {
+        setError(true);
+      }
+    } catch {
       setError(true);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -45,10 +56,6 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
         <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Player Access</p>
         <h2 className="text-2xl font-black">{playerName}</h2>
         <p className="text-sm text-white/40 mt-1">Enter your PIN to continue.</p>
-        <p className="text-xs text-white/30 mt-2">
-          Need your PIN or having trouble?{" "}
-          <span className="text-white/50">Text or call Coach Nick directly.</span>
-        </p>
       </div>
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
@@ -76,9 +83,9 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
 
         {error && (
           <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-3 text-center">
-            <p className="text-red-400 font-bold text-sm">Incorrect PIN</p>
+            <p className="text-red-400 font-bold">Wrong PIN</p>
             <p className="text-white/50 text-xs mt-1">
-              Need help? Text or call Coach Nick directly.
+              Text or call Coach Nick directly for help.
             </p>
           </div>
         )}
@@ -86,17 +93,26 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
         <button
           type="button"
           onClick={handleSubmit}
-          className="w-full py-3 bg-white text-black font-black text-sm rounded-xl hover:bg-white/90 active:scale-95 transition-all"
+          disabled={loading || !pin}
+          className="w-full py-3 bg-white text-black font-black text-sm rounded-xl hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          Unlock
+          {loading ? (
+            <>
+              <svg className="animate-spin w-4 h-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Checking...
+            </>
+          ) : (
+            "Unlock"
+          )}
         </button>
 
-        {!error && (
-          <p className="text-xs text-white/30 text-center">
-            Need your PIN?{" "}
-            <span className="text-white/50">Text or call Coach Nick.</span>
-          </p>
-        )}
+        <p className="text-xs text-white/30 text-center">
+          Need your PIN?{" "}
+          <span className="text-white/50">Text or call Coach Nick.</span>
+        </p>
       </div>
     </div>
   );
