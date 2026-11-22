@@ -24,6 +24,8 @@ type Player = {
   id: number;
   name: string;
   age: string;
+  bats: string;
+  throws: string;
   pos: string[];
   notes: string;
   scores: Scores;
@@ -151,9 +153,14 @@ function ScoringModal({
           <div>
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Scoring</p>
             <h2 className="text-xl font-black">{player.name}</h2>
-            {(player.age || player.pos.length > 0) && (
+            {(player.age || player.pos.length > 0 || player.bats || player.throws) && (
               <p className="text-xs text-white/40 mt-0.5">
-                {[player.age ? `Age ${player.age}` : "", player.pos.join("/")].filter(Boolean).join(" · ")}
+                {[
+                  player.age ? `Age ${player.age}` : "",
+                  player.pos.join("/"),
+                  player.bats ? `B:${player.bats}` : "",
+                  player.throws ? `T:${player.throws}` : "",
+                ].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -249,6 +256,8 @@ function ScoringModal({
                   await sheetsPost("saveTryoutPlayer", {
                     playerName: updated.name,
                     age: updated.age,
+                    bats: updated.bats,
+                    throws: updated.throws,
                     positions: updated.pos.join(", "),
                     tryoutDate: new Date().toISOString().slice(0, 10),
                     ...Object.fromEntries(
@@ -306,6 +315,11 @@ function PlayerCard({
             {[player.pos.join(" / "), player.age ? `Age ${player.age}` : ""].filter(Boolean).join(" · ")}
           </p>
         )}
+        {(player.bats || player.throws) && (
+          <p className="text-xs text-white/30 mt-0.5">
+            {[player.bats ? `B: ${player.bats}` : "", player.throws ? `T: ${player.throws}` : ""].filter(Boolean).join("  ")}
+          </p>
+        )}
         {(player.exitVelo || player.throwVelo) && (
           <p className="text-xs text-white/30 tabular-nums mt-0.5">
             {[player.exitVelo ? `EV ${player.exitVelo} mph` : "", player.throwVelo ? `TV ${player.throwVelo} mph` : ""].filter(Boolean).join(" · ")}
@@ -322,10 +336,43 @@ function PlayerCard({
   );
 }
 
+// ── Hand picker ───────────────────────────────────────────────────
+function HandPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 flex-1">
+      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{label}</span>
+      <div className="flex gap-1.5">
+        {["R", "L", "S"].map((h) => (
+          <button
+            key={h}
+            type="button"
+            onClick={() => onChange(value === h ? "" : h)}
+            className={`flex-1 py-1.5 rounded-md text-xs font-black transition-colors ${
+              value === h ? "bg-white text-black" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+            }`}
+          >
+            {h === "R" ? "Right" : h === "L" ? "Left" : "Switch"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Add player form ───────────────────────────────────────────────
 function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
+  const [bats, setBats] = useState("");
+  const [throws, setThrows] = useState("");
   const [pos, setPos] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -333,9 +380,11 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: Date.now(), name: n, age, pos, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
+    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
     setName("");
     setAge("");
+    setBats("");
+    setThrows("");
     setPos([]);
   }
 
@@ -370,6 +419,10 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
         max={18}
         className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
       />
+      <div className="flex gap-3">
+        <HandPicker label="Bats" value={bats} onChange={setBats} />
+        <HandPicker label="Throws" value={throws} onChange={setThrows} />
+      </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Positions</span>
         <PositionPicker selected={pos} onChange={setPos} />
