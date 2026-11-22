@@ -14,6 +14,7 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
+  const [showPin, setShowPin] = useState(false);
 
   useEffect(() => {
     setUnlocked(isPlayerUnlocked(playerId));
@@ -51,24 +52,51 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
       </div>
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
-        <input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          maxLength={8}
-          value={pin}
-          onChange={(e) => { setPin(e.target.value); setError(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-          placeholder="PIN"
-          className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center text-2xl font-black tracking-widest text-white placeholder-white/20 focus:outline-none focus:border-white/30 w-full"
-        />
-        {error && <p className="text-red-400 text-sm text-center">Incorrect PIN.</p>}
+        <div className="relative">
+          <input
+            autoFocus
+            autoComplete="off"
+            type={showPin ? "text" : "password"}
+            inputMode="numeric"
+            maxLength={8}
+            value={pin}
+            onChange={(e) => { setPin(e.target.value); setError(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+            placeholder="PIN"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center text-2xl font-black tracking-widest text-white placeholder-white/20 focus:outline-none focus:border-white/30 w-full pr-12"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPin((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 text-xs font-semibold"
+          >
+            {showPin ? "HIDE" : "SHOW"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-3 text-center">
+            <p className="text-red-400 font-bold text-sm">Incorrect PIN</p>
+            <p className="text-white/50 text-xs mt-1">
+              Need help? Text or call Coach Nick directly.
+            </p>
+          </div>
+        )}
+
         <button
+          type="button"
           onClick={handleSubmit}
-          className="w-full py-3 bg-white text-black font-black text-sm rounded-xl hover:bg-white/90 transition-colors"
+          className="w-full py-3 bg-white text-black font-black text-sm rounded-xl hover:bg-white/90 active:scale-95 transition-all"
         >
           Unlock
         </button>
+
+        {!error && (
+          <p className="text-xs text-white/30 text-center">
+            Need your PIN?{" "}
+            <span className="text-white/50">Text or call Coach Nick.</span>
+          </p>
+        )}
       </div>
     </div>
   );
