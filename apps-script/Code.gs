@@ -417,6 +417,19 @@ function doGet(e) {
     var paSheet = getSheet_(PRACTICE_ATTENDANCE_SHEET, ["Id", "SessionId", "PlayerName", "Present", "Reason", "CreatedAt"]);
     backfillIds_(paSheet);
     result = rowsToObjects_(paSheet.getDataRange().getValues());
+  } else if (action === "tryoutPlayers") {
+    var tpSheet = getSheet_(TRYOUTS_SHEET, [
+      "Id","SheetId","SavedAt","TryoutDate","PlayerName","Age","Bats","Throws","PrevTeam","City","Coach","Positions",
+      "Effort","Attitude","Recovery","ParentConvo","TakingCorrection",
+      "Swing","FieldingMechanics","PersonalAppearance","ArrivalTime",
+      "ExitVelo","ThrowVelo","Notes"
+    ]);
+    var tpDate = e.parameter.date || "";
+    var tpAll = rowsToObjects_(tpSheet.getDataRange().getValues());
+    if (tpDate) {
+      tpAll = tpAll.filter(function(r) { return String(r.TryoutDate) === tpDate; });
+    }
+    result = tpAll;
   } else if (action === "homework") {
     var hwSheet = getSheet_(HOMEWORK_SHEET, ["Id","WeekOf","Tasks","UpdatedBy","UpdatedAt"]);
     var hwData = hwSheet.getDataRange().getValues();

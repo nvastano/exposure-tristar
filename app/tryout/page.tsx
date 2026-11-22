@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { sheetsPost } from "@/lib/sheets";
+import { useState, useEffect } from "react";
+import { sheetsGet, sheetsPost } from "@/lib/sheets";
 
 const POSITIONS = ["Pitcher", "Catcher", "1st Base", "2nd Base", "3rd Base", "Shortstop", "Outfield", "Utility"] as const;
 
@@ -497,6 +497,44 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
 export default function TryoutPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [scoring, setScoring] = useState<Player | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    sheetsGet("tryoutPlayers", { date: today })
+      .then((rows: Record<string, string>[]) => {
+        setPlayers(
+          rows.map((r) => ({
+            id: Number(r.SheetId) || Date.now(),
+            name: r.PlayerName || "",
+            age: r.Age || "",
+            bats: r.Bats || "",
+            throws: r.Throws || "",
+            pos: r.Positions ? r.Positions.split(",").map((s) => s.trim()).filter(Boolean) : [],
+            prevTeam: r.PrevTeam || "",
+            city: r.City || "",
+            coach: r.Coach || "",
+            notes: r.Notes || "",
+            exitVelo: r.ExitVelo || "",
+            throwVelo: r.ThrowVelo || "",
+            scores: {
+              effort:            r.Effort !== "" && r.Effort != null ? Number(r.Effort) : undefined,
+              attitude:          r.Attitude !== "" && r.Attitude != null ? Number(r.Attitude) : undefined,
+              recovery:          r.Recovery !== "" && r.Recovery != null ? Number(r.Recovery) : undefined,
+              parentConvo:       r.ParentConvo !== "" && r.ParentConvo != null ? Number(r.ParentConvo) : undefined,
+              takingCorrection:  r.TakingCorrection !== "" && r.TakingCorrection != null ? Number(r.TakingCorrection) : undefined,
+              swing:             r.Swing !== "" && r.Swing != null ? Number(r.Swing) : undefined,
+              fieldingMechanics: r.FieldingMechanics !== "" && r.FieldingMechanics != null ? Number(r.FieldingMechanics) : undefined,
+              personalAppearance:r.PersonalAppearance !== "" && r.PersonalAppearance != null ? Number(r.PersonalAppearance) : undefined,
+              arrivalTime:       r.ArrivalTime !== "" && r.ArrivalTime != null ? Number(r.ArrivalTime) : undefined,
+            },
+          }))
+        );
+      })
+      .catch(() => setLoadError("Couldn't load players from sheet."))
+      .finally(() => setLoading(false));
+  }, []);
 
   function playerPayload(p: Player) {
     return {
@@ -556,8 +594,16 @@ export default function TryoutPage() {
         </p>
       </div>
 
+      {/* Load state */}
+      {loading && (
+        <p className="text-sm text-white/40 text-center py-4">Loading players…</p>
+      )}
+      {loadError && (
+        <p className="text-sm text-red-400 text-center">{loadError}</p>
+      )}
+
       {/* Player list */}
-      {sorted.length > 0 && (
+      {!loading && sorted.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">
@@ -584,6 +630,10 @@ export default function TryoutPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {!loading && sorted.length === 0 && !loadError && (
+        <p className="text-sm text-white/30 text-center py-2">No players added yet for today.</p>
       )}
 
       <AddPlayerForm onAdd={addPlayer} />
