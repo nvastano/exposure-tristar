@@ -44,6 +44,10 @@ export default function PlayerPinGate({ playerId, playerName, storedPin, childre
         <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Player Access</p>
         <h2 className="text-2xl font-black">{playerName}</h2>
         <p className="text-sm text-white/40 mt-1">Enter your PIN to continue.</p>
+        <p className="text-xs text-white/30 mt-2">
+          Need your PIN or having trouble?{" "}
+          <span className="text-white/50">Text or call Coach Nick directly.</span>
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
