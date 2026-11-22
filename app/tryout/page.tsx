@@ -31,21 +31,40 @@ type Player = {
   pos: string[];
   prevTeam: string;
   city: string;
+};
+
+type Entry = {
   coach: string;
-  notes: string;
   scores: Scores;
   exitVelo: string;
   throwVelo: string;
+  notes: string;
+  tryoutDate: string;
 };
 
 function emptyScores(): Scores {
   return {};
 }
 
-function avg(scores: Scores): number | null {
+function entryAvg(scores: Scores): number | null {
   const vals = CATEGORIES.map((c) => scores[c.key]).filter((v): v is number => v != null);
   if (!vals.length) return null;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function avgAcrossEntries(entries: Entry[]): Scores {
+  const result: Scores = {};
+  for (const cat of CATEGORIES) {
+    const vals = entries.map((e) => e.scores[cat.key]).filter((v): v is number => v != null);
+    if (vals.length) result[cat.key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  return result;
+}
+
+function overallAvg(entries: Entry[]): number | null {
+  const avgs = entries.map((e) => entryAvg(e.scores)).filter((v): v is number => v != null);
+  if (!avgs.length) return null;
+  return avgs.reduce((a, b) => a + b, 0) / avgs.length;
 }
 
 function scoreColor(n: number | null): string {
@@ -123,21 +142,23 @@ function ScoreRow({
   );
 }
 
-// ── Scoring modal ─────────────────────────────────────────────────
+// ── Scoring modal (eval editor) ───────────────────────────────────
 function ScoringModal({
   player,
+  initialEntry,
   onSave,
   onClose,
 }: {
   player: Player;
-  onSave: (updated: Player) => void;
+  initialEntry: Entry | null;
+  onSave: (entry: Entry) => void;
   onClose: () => void;
 }) {
-  const [scores, setScores] = useState<Scores>({ ...player.scores });
-  const [exitVelo, setExitVelo] = useState(player.exitVelo);
-  const [throwVelo, setThrowVelo] = useState(player.throwVelo);
-  const [notes, setNotes] = useState(player.notes);
-  const [coach, setCoach] = useState(player.coach);
+  const [scores, setScores] = useState<Scores>(initialEntry ? { ...initialEntry.scores } : emptyScores());
+  const [exitVelo, setExitVelo] = useState(initialEntry?.exitVelo ?? "");
+  const [throwVelo, setThrowVelo] = useState(initialEntry?.throwVelo ?? "");
+  const [notes, setNotes] = useState(initialEntry?.notes ?? "");
+  const [coach, setCoach] = useState(initialEntry?.coach ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -145,7 +166,7 @@ function ScoringModal({
     setScores((prev) => ({ ...prev, [key]: val }));
   }
 
-  const average = avg(scores);
+  const average = entryAvg(scores);
   const scored = CATEGORIES.filter((c) => scores[c.key] != null).length;
 
   return (
@@ -157,7 +178,9 @@ function ScoringModal({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
           <div>
-            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Scoring</p>
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">
+              {initialEntry ? "Edit Eval" : "New Eval"}
+            </p>
             <h2 className="text-xl font-black">{player.name}</h2>
             {(player.age || player.pos.length > 0 || player.bats || player.throws) && (
               <p className="text-xs text-white/40 mt-0.5">
@@ -284,29 +307,187 @@ function ScoringModal({
               onClick={async () => {
                 setSaveError(null);
                 setSaving(true);
-                const updated = { ...player, scores, exitVelo, throwVelo, notes, coach };
+                const entry: Entry = {
+                  coach,
+                  scores,
+                  exitVelo,
+                  throwVelo,
+                  notes,
+                  tryoutDate: new Date().toISOString().slice(0, 10),
+                };
                 try {
                   await sheetsPost("saveTryoutEntry", {
-                    tryoutSheetId: String(updated.id),
-                    tryoutDate: new Date().toISOString().slice(0, 10),
-                    coach: updated.coach,
-                    ...Object.fromEntries(CATEGORIES.map((c) => [c.key, updated.scores[c.key] ?? ""])),
-                    exitVelo: updated.exitVelo,
-                    throwVelo: updated.throwVelo,
-                    notes: updated.notes,
+                    tryoutSheetId: String(player.id),
+                    tryoutDate: entry.tryoutDate,
+                    coach: entry.coach,
+                    ...Object.fromEntries(CATEGORIES.map((c) => [c.key, entry.scores[c.key] ?? ""])),
+                    exitVelo: entry.exitVelo,
+                    throwVelo: entry.throwVelo,
+                    notes: entry.notes,
                   });
                 } catch {
                   setSaveError("Sheet save failed — scores kept locally.");
                 } finally {
                   setSaving(false);
-                  onSave(updated);
+                  onSave(entry);
                 }
               }}
               className="flex-1 py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors disabled:opacity-40"
             >
-              {saving ? "Saving…" : "Save Scores"}
+              {saving ? "Saving…" : "Save Eval"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Player detail view ────────────────────────────────────────────
+function PlayerDetail({
+  player,
+  entries,
+  onAddEval,
+  onEditEval,
+  onBack,
+}: {
+  player: Player;
+  entries: Entry[];
+  onAddEval: () => void;
+  onEditEval: (entry: Entry) => void;
+  onBack: () => void;
+}) {
+  const overall = overallAvg(entries);
+  const avgScores = avgAcrossEntries(entries);
+  const totalScored = CATEGORIES.filter((c) => avgScores[c.key] != null).length;
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 overflow-hidden"
+      onClick={(e) => e.target === e.currentTarget && onBack()}
+    >
+      <div className="w-full sm:max-w-lg bg-zinc-900 border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92dvh]">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10 shrink-0">
+          <button
+            onClick={onBack}
+            className="text-white/40 hover:text-white transition-colors p-1 -ml-1"
+          >
+            ←
+          </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-black truncate">{player.name}</h2>
+            {(player.age || player.pos.length > 0 || player.bats || player.throws) && (
+              <p className="text-xs text-white/40 mt-0.5">
+                {[
+                  player.age ? `Age ${player.age}` : "",
+                  player.pos.join("/"),
+                  player.bats ? `B:${player.bats}` : "",
+                  player.throws ? `T:${player.throws}` : "",
+                ].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {(player.prevTeam || player.city) && (
+              <p className="text-xs text-white/30 mt-0.5">
+                {[player.prevTeam, player.city].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <p className={`text-3xl font-black tabular-nums ${scoreColor(overall)}`}>
+              {overall !== null ? overall.toFixed(1) : "—"}
+            </p>
+            <p className="text-xs text-white/30">{entries.length} eval{entries.length !== 1 ? "s" : ""}</p>
+          </div>
+        </div>
+
+        {/* Eval list */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-3">
+          {entries.length === 0 && (
+            <p className="text-sm text-white/30 text-center py-6">No evals yet. Be the first to score this player.</p>
+          )}
+
+          {entries.map((entry, i) => {
+            const avg = entryAvg(entry.scores);
+            const scored = CATEGORIES.filter((c) => entry.scores[c.key] != null).length;
+            return (
+              <button
+                key={i}
+                onClick={() => onEditEval(entry)}
+                className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl p-4 transition-all"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">{entry.coach || <span className="text-white/30 italic">Unknown coach</span>}</p>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      {scored === CATEGORIES.length ? "Complete ✓" : scored === 0 ? "No scores yet" : `${scored}/${CATEGORIES.length} scored`}
+                    </p>
+                    {(entry.exitVelo || entry.throwVelo) && (
+                      <p className="text-xs text-white/30 tabular-nums mt-0.5">
+                        {[entry.exitVelo ? `EV ${entry.exitVelo} mph` : "", entry.throwVelo ? `TV ${entry.throwVelo} mph` : ""].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    {entry.notes && (
+                      <p className="text-xs text-white/30 mt-1 truncate">{entry.notes}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className={`text-2xl font-black tabular-nums ${scoreColor(avg)}`}>
+                      {avg !== null ? avg.toFixed(1) : "—"}
+                    </p>
+                    <p className="text-xs text-white/30">/5</p>
+                  </div>
+                </div>
+
+                {/* Per-category mini scores */}
+                {scored > 0 && (
+                  <div className="mt-3 grid grid-cols-9 gap-1">
+                    {CATEGORIES.map((cat) => {
+                      const v = entry.scores[cat.key];
+                      return (
+                        <div key={cat.key} className="flex flex-col items-center gap-0.5">
+                          <span className="text-white/20 text-[9px] leading-none">{cat.label.split(" ").map((w) => w[0]).join("")}</span>
+                          <span className={`text-xs font-bold tabular-nums ${scoreColor(v ?? null)}`}>
+                            {v ?? "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Averaged summary if multiple evals */}
+          {entries.length > 1 && totalScored > 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-3">Avg Across All Evals</p>
+              <div className="grid grid-cols-9 gap-1">
+                {CATEGORIES.map((cat) => {
+                  const v = avgScores[cat.key];
+                  return (
+                    <div key={cat.key} className="flex flex-col items-center gap-0.5">
+                      <span className="text-white/20 text-[9px] leading-none">{cat.label.split(" ").map((w) => w[0]).join("")}</span>
+                      <span className={`text-xs font-bold tabular-nums ${scoreColor(v ?? null)}`}>
+                        {v != null ? v.toFixed(1) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-white/10 px-5 py-4">
+          <button
+            onClick={onAddEval}
+            className="w-full py-3 rounded-xl bg-white text-black font-black text-sm hover:bg-white/90 transition-colors"
+          >
+            + Add Eval
+          </button>
         </div>
       </div>
     </div>
@@ -316,16 +497,17 @@ function ScoringModal({
 // ── Player card ───────────────────────────────────────────────────
 function PlayerCard({
   player,
+  entries,
   rank,
   onClick,
 }: {
   player: Player;
+  entries: Entry[];
   rank: number;
   onClick: () => void;
 }) {
-  const average = avg(player.scores);
-  const scored = CATEGORIES.filter((c) => player.scores[c.key] != null).length;
-  const complete = scored === CATEGORIES.length;
+  const avg = overallAvg(entries);
+  const evalCount = entries.length;
 
   return (
     <button
@@ -336,7 +518,7 @@ function PlayerCard({
       <div className="flex-1 min-w-0">
         <p className="font-bold truncate">{player.name}</p>
         <p className="text-xs text-white/40 mt-0.5">
-          {complete ? "Complete ✓" : scored === 0 ? "Not yet scored" : `${scored}/${CATEGORIES.length} scored`}
+          {evalCount === 0 ? "No evals yet" : `${evalCount} eval${evalCount !== 1 ? "s" : ""}`}
         </p>
         {(player.pos.length > 0 || player.age) && (
           <p className="text-xs text-white/30 mt-0.5 truncate">
@@ -348,15 +530,10 @@ function PlayerCard({
             {[player.bats ? `B: ${player.bats}` : "", player.throws ? `T: ${player.throws}` : ""].filter(Boolean).join("  ")}
           </p>
         )}
-        {(player.exitVelo || player.throwVelo) && (
-          <p className="text-xs text-white/30 tabular-nums mt-0.5">
-            {[player.exitVelo ? `EV ${player.exitVelo} mph` : "", player.throwVelo ? `TV ${player.throwVelo} mph` : ""].filter(Boolean).join(" · ")}
-          </p>
-        )}
       </div>
       <div className="shrink-0 text-right">
-        <p className={`text-2xl font-black tabular-nums ${scoreColor(average)}`}>
-          {average !== null ? average.toFixed(1) : "—"}
+        <p className={`text-2xl font-black tabular-nums ${scoreColor(avg)}`}>
+          {avg !== null ? avg.toFixed(1) : "—"}
         </p>
         <p className="text-xs text-white/30">/5</p>
       </div>
@@ -410,7 +587,7 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, prevTeam, city, coach: "", notes: "", scores: emptyScores(), exitVelo: "", throwVelo: "" });
+    onAdd({ id: Date.now(), name: n, age, bats, throws, pos, prevTeam, city });
     setName("");
     setAge("");
     setBats("");
@@ -418,6 +595,7 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
     setPrevTeam("");
     setCity("");
     setPos([]);
+    setOpen(false);
   }
 
   if (!open) {
@@ -497,105 +675,113 @@ function AddPlayerForm({ onAdd }: { onAdd: (p: Player) => void }) {
 // ── Page ──────────────────────────────────────────────────────────
 export default function TryoutPage() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [scoring, setScoring] = useState<Player | null>(null);
+  const [entriesByPlayer, setEntriesByPlayer] = useState<Record<string, Entry[]>>({});
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [editingEntry, setEditingEntry] = useState<Entry | null | "new">(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
     Promise.all([
       sheetsGet("tryoutPlayers"),
       sheetsGet("tryoutEntries"),
     ])
       .then(([playerRows, entryRows]: [Record<string, string>[], Record<string, string>[]]) => {
-        // Group entries by TryoutSheetId; average each score category across all coaches
-        const entriesByPlayer: Record<string, Record<string, string>[]> = {};
+        const grouped: Record<string, Entry[]> = {};
         for (const e of entryRows) {
           const key = String(e.TryoutSheetId);
-          if (!entriesByPlayer[key]) entriesByPlayer[key] = [];
-          entriesByPlayer[key].push(e);
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push({
+            coach: e.Coach || "",
+            scores: {
+              effort:            e.Effort !== "" && e.Effort != null ? Number(e.Effort) : undefined,
+              attitude:          e.Attitude !== "" && e.Attitude != null ? Number(e.Attitude) : undefined,
+              recovery:          e.Recovery !== "" && e.Recovery != null ? Number(e.Recovery) : undefined,
+              parentConvo:       e.ParentConvo !== "" && e.ParentConvo != null ? Number(e.ParentConvo) : undefined,
+              takingCorrection:  e.TakingCorrection !== "" && e.TakingCorrection != null ? Number(e.TakingCorrection) : undefined,
+              swing:             e.Swing !== "" && e.Swing != null ? Number(e.Swing) : undefined,
+              fieldingMechanics: e.FieldingMechanics !== "" && e.FieldingMechanics != null ? Number(e.FieldingMechanics) : undefined,
+              personalAppearance:e.PersonalAppearance !== "" && e.PersonalAppearance != null ? Number(e.PersonalAppearance) : undefined,
+              arrivalTime:       e.ArrivalTime !== "" && e.ArrivalTime != null ? Number(e.ArrivalTime) : undefined,
+            },
+            exitVelo: e.ExitVelo || "",
+            throwVelo: e.ThrowVelo || "",
+            notes: e.Notes || "",
+            tryoutDate: e.TryoutDate || "",
+          });
         }
-        function avgEntries(entries: Record<string, string>[], key: string): number | undefined {
-          const vals = entries.map((e) => e[key]).filter((v) => v !== "" && v != null).map(Number).filter((n) => !isNaN(n));
-          return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
-        }
+        setEntriesByPlayer(grouped);
         setPlayers(
-          playerRows.map((r) => {
-            const sheetId = String(r.SheetId);
-            const entries = entriesByPlayer[sheetId] || [];
-            return {
-              id: Number(r.SheetId) || Date.now(),
-              name: r.PlayerName || "",
-              age: r.Age || "",
-              bats: r.Bats || "",
-              throws: r.Throws || "",
-              pos: r.Positions ? r.Positions.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-              prevTeam: r.PrevTeam || "",
-              city: r.City || "",
-              coach: "",
-              notes: entries[0]?.Notes || "",
-              exitVelo: entries[0]?.ExitVelo || "",
-              throwVelo: entries[0]?.ThrowVelo || "",
-              scores: {
-                effort:            avgEntries(entries, "Effort"),
-                attitude:          avgEntries(entries, "Attitude"),
-                recovery:          avgEntries(entries, "Recovery"),
-                parentConvo:       avgEntries(entries, "ParentConvo"),
-                takingCorrection:  avgEntries(entries, "TakingCorrection"),
-                swing:             avgEntries(entries, "Swing"),
-                fieldingMechanics: avgEntries(entries, "FieldingMechanics"),
-                personalAppearance:avgEntries(entries, "PersonalAppearance"),
-                arrivalTime:       avgEntries(entries, "ArrivalTime"),
-              },
-            };
-          })
+          playerRows.map((r) => ({
+            id: Number(r.SheetId) || Date.now(),
+            name: r.PlayerName || "",
+            age: r.Age || "",
+            bats: r.Bats || "",
+            throws: r.Throws || "",
+            pos: r.Positions ? r.Positions.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+            prevTeam: r.PrevTeam || "",
+            city: r.City || "",
+          }))
         );
       })
       .catch(() => setLoadError("Couldn't load players from sheet."))
       .finally(() => setLoading(false));
   }, []);
 
-  function playerPayload(p: Player) {
-    return {
-      sheetId: String(p.id),
-      playerName: p.name,
-      age: p.age,
-      bats: p.bats,
-      throws: p.throws,
-      prevTeam: p.prevTeam,
-      city: p.city,
-      positions: p.pos.join(", "),
-      tryoutDate: new Date().toISOString().slice(0, 10),
-    };
-  }
-
   async function addPlayer(p: Player) {
     setPlayers((prev) => [...prev, p]);
     try {
-      await sheetsPost("saveTryoutPlayer", playerPayload(p));
+      await sheetsPost("saveTryoutPlayer", {
+        sheetId: String(p.id),
+        playerName: p.name,
+        age: p.age,
+        bats: p.bats,
+        throws: p.throws,
+        prevTeam: p.prevTeam,
+        city: p.city,
+        positions: p.pos.join(", "),
+        tryoutDate: new Date().toISOString().slice(0, 10),
+      });
     } catch {
-      // silent — player is added locally regardless
+      // silent
     }
   }
 
-  function saveScores(updated: Player) {
-    setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    setScoring(null);
+  function saveEntry(entry: Entry) {
+    if (!selectedPlayer) return;
+    const key = String(selectedPlayer.id);
+    setEntriesByPlayer((prev) => {
+      const existing = prev[key] || [];
+      const idx = existing.findIndex((e) => e.coach === entry.coach);
+      const updated = idx >= 0
+        ? existing.map((e, i) => i === idx ? entry : e)
+        : [...existing, entry];
+      return { ...prev, [key]: updated };
+    });
+    setEditingEntry(null);
   }
 
   function removePlayer(id: number) {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
+    setEntriesByPlayer((prev) => {
+      const next = { ...prev };
+      delete next[String(id)];
+      return next;
+    });
   }
 
-  // Sort by average descending, unsorted at bottom
+  // Sort by overall average descending
   const sorted = [...players].sort((a, b) => {
-    const aa = avg(a.scores);
-    const bb = avg(b.scores);
+    const aa = overallAvg(entriesByPlayer[String(a.id)] || []);
+    const bb = overallAvg(entriesByPlayer[String(b.id)] || []);
     if (aa === null && bb === null) return 0;
     if (aa === null) return 1;
     if (bb === null) return -1;
     return bb - aa;
   });
+
+  const selectedEntries = selectedPlayer ? (entriesByPlayer[String(selectedPlayer.id)] || []) : [];
+  const avgScoresForTable = (p: Player) => avgAcrossEntries(entriesByPlayer[String(p.id)] || []);
 
   return (
     <div className="max-w-lg mx-auto flex flex-col gap-6">
@@ -604,11 +790,10 @@ export default function TryoutPage() {
         <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Tristar Baseball</p>
         <h1 className="text-3xl font-black tracking-tight">Tryout Scoring</h1>
         <p className="text-sm text-white/40 mt-1">
-          Add players, then tap a card to score them.
+          Tap a player to view evals and add your own.
         </p>
       </div>
 
-      {/* Load state */}
       {loading && (
         <p className="text-sm text-white/40 text-center py-4">Loading players…</p>
       )}
@@ -623,7 +808,7 @@ export default function TryoutPage() {
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">
               {players.length} Player{players.length !== 1 ? "s" : ""}
             </p>
-            {sorted.some((p) => avg(p.scores) !== null) && (
+            {sorted.some((p) => overallAvg(entriesByPlayer[String(p.id)] || []) !== null) && (
               <p className="text-xs text-white/30">ranked by avg</p>
             )}
           </div>
@@ -631,8 +816,9 @@ export default function TryoutPage() {
             <div key={p.id} className="relative group">
               <PlayerCard
                 player={p}
+                entries={entriesByPlayer[String(p.id)] || []}
                 rank={i + 1}
-                onClick={() => setScoring(p)}
+                onClick={() => setSelectedPlayer(p)}
               />
               <button
                 onClick={() => removePlayer(p.id)}
@@ -647,13 +833,13 @@ export default function TryoutPage() {
       )}
 
       {!loading && sorted.length === 0 && !loadError && (
-        <p className="text-sm text-white/30 text-center py-2">No players added yet for today.</p>
+        <p className="text-sm text-white/30 text-center py-2">No players added yet.</p>
       )}
 
       <AddPlayerForm onAdd={addPlayer} />
 
       {/* Score summary table */}
-      {players.some((p) => avg(p.scores) !== null) && (
+      {players.some((p) => overallAvg(entriesByPlayer[String(p.id)] || []) !== null) && (
         <div className="border border-white/10 rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 bg-white/5">
             <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Category Breakdown</p>
@@ -673,24 +859,28 @@ export default function TryoutPage() {
               </thead>
               <tbody>
                 {sorted
-                  .filter((p) => avg(p.scores) !== null)
-                  .map((p) => (
-                    <tr
-                      key={p.id}
-                      onClick={() => setScoring(p)}
-                      className="border-b border-white/5 last:border-none hover:bg-white/5 cursor-pointer"
-                    >
-                      <td className="px-4 py-2 font-bold truncate max-w-[100px]">{p.name}</td>
-                      {CATEGORIES.map((c) => (
-                        <td key={c.key} className={`px-2 py-2 text-center tabular-nums font-semibold ${scoreColor(p.scores[c.key] ?? null)}`}>
-                          {p.scores[c.key] ?? "—"}
+                  .filter((p) => overallAvg(entriesByPlayer[String(p.id)] || []) !== null)
+                  .map((p) => {
+                    const scores = avgScoresForTable(p);
+                    const avg = overallAvg(entriesByPlayer[String(p.id)] || []);
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={() => setSelectedPlayer(p)}
+                        className="border-b border-white/5 last:border-none hover:bg-white/5 cursor-pointer"
+                      >
+                        <td className="px-4 py-2 font-bold truncate max-w-[100px]">{p.name}</td>
+                        {CATEGORIES.map((c) => (
+                          <td key={c.key} className={`px-2 py-2 text-center tabular-nums font-semibold ${scoreColor(scores[c.key] ?? null)}`}>
+                            {scores[c.key] != null ? (scores[c.key] as number).toFixed(1) : "—"}
+                          </td>
+                        ))}
+                        <td className={`px-3 py-2 text-right font-black tabular-nums ${scoreColor(avg)}`}>
+                          {avg?.toFixed(1)}
                         </td>
-                      ))}
-                      <td className={`px-3 py-2 text-right font-black tabular-nums ${scoreColor(avg(p.scores))}`}>
-                        {avg(p.scores)?.toFixed(1)}
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -700,12 +890,24 @@ export default function TryoutPage() {
         </div>
       )}
 
+      {/* Player detail view */}
+      {selectedPlayer && editingEntry === null && (
+        <PlayerDetail
+          player={selectedPlayer}
+          entries={selectedEntries}
+          onAddEval={() => setEditingEntry("new")}
+          onEditEval={(entry) => setEditingEntry(entry)}
+          onBack={() => setSelectedPlayer(null)}
+        />
+      )}
+
       {/* Scoring modal */}
-      {scoring && (
+      {selectedPlayer && editingEntry !== null && (
         <ScoringModal
-          player={scoring}
-          onSave={saveScores}
-          onClose={() => setScoring(null)}
+          player={selectedPlayer}
+          initialEntry={editingEntry === "new" ? null : editingEntry}
+          onSave={saveEntry}
+          onClose={() => setEditingEntry(null)}
         />
       )}
     </div>
