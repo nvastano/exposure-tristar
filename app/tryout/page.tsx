@@ -349,17 +349,53 @@ function PlayerDetail({
   entries,
   onAddEval,
   onEditEval,
+  onUpdatePlayer,
   onBack,
 }: {
   player: Player;
   entries: Entry[];
   onAddEval: () => void;
   onEditEval: (entry: Entry) => void;
+  onUpdatePlayer: (p: Player) => void;
   onBack: () => void;
 }) {
   const overall = overallAvg(entries);
   const avgScores = avgAcrossEntries(entries);
   const totalScored = CATEGORIES.filter((c) => avgScores[c.key] != null).length;
+
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [name, setName] = useState(player.name);
+  const [age, setAge] = useState(player.age);
+  const [bats, setBats] = useState(player.bats);
+  const [throws, setThrows] = useState(player.throws);
+  const [prevTeam, setPrevTeam] = useState(player.prevTeam);
+  const [city, setCity] = useState(player.city);
+  const [pos, setPos] = useState(player.pos);
+  const [saving, setSaving] = useState(false);
+
+  async function savePlayerInfo() {
+    setSaving(true);
+    const updated: Player = { ...player, name, age, bats, throws, prevTeam, city, pos };
+    try {
+      await sheetsPost("saveTryoutPlayer", {
+        sheetId: String(player.id),
+        playerName: name,
+        age,
+        bats,
+        throws,
+        prevTeam,
+        city,
+        positions: pos.join(", "),
+        tryoutDate: new Date().toISOString().slice(0, 10),
+      });
+    } catch {
+      // keep local update regardless
+    } finally {
+      setSaving(false);
+      onUpdatePlayer(updated);
+      setEditingInfo(false);
+    }
+  }
 
   return (
     <div
@@ -393,17 +429,80 @@ function PlayerDetail({
               </p>
             )}
           </div>
-          <div className="text-right shrink-0">
-            <p className={`text-3xl font-black tabular-nums ${scoreColor(overall)}`}>
-              {overall !== null ? overall.toFixed(1) : "—"}
-            </p>
-            <p className="text-xs text-white/30">{entries.length} eval{entries.length !== 1 ? "s" : ""}</p>
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => setEditingInfo((v) => !v)}
+              className="text-xs font-bold text-white/30 hover:text-white/70 transition-colors mt-1"
+            >
+              {editingInfo ? "Done" : "Edit"}
+            </button>
+            <div className="text-right">
+              <p className={`text-3xl font-black tabular-nums ${scoreColor(overall)}`}>
+                {overall !== null ? overall.toFixed(1) : "—"}
+              </p>
+              <p className="text-xs text-white/30">{entries.length} eval{entries.length !== 1 ? "s" : ""}</p>
+            </div>
           </div>
         </div>
 
-        {/* Eval list */}
+        {/* Scroll area */}
         <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-3">
-          {entries.length === 0 && (
+
+          {/* Editable player info */}
+          {editingInfo && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+              <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Player Info</p>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Player name"
+                className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
+              />
+              <input
+                type="number"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="Age"
+                min={5}
+                max={18}
+                className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30 w-full"
+              />
+              <div className="flex gap-3">
+                <HandPicker label="Bats" value={bats} onChange={setBats} />
+                <HandPicker label="Throws" value={throws} onChange={setThrows} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={prevTeam}
+                  onChange={(e) => setPrevTeam(e.target.value)}
+                  placeholder="Previous team"
+                  className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                />
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                  className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Positions</span>
+                <PositionPicker selected={pos} onChange={setPos} />
+              </div>
+              <button
+                onClick={savePlayerInfo}
+                disabled={saving || !name.trim()}
+                className="w-full py-2.5 bg-white text-black rounded-lg text-sm font-black hover:bg-white/90 transition-colors disabled:opacity-40"
+              >
+                {saving ? "Saving…" : "Save Player Info"}
+              </button>
+            </div>
+          )}
+
+          {entries.length === 0 && !editingInfo && (
             <p className="text-sm text-white/30 text-center py-6">No evals yet. Be the first to score this player.</p>
           )}
 
@@ -747,6 +846,11 @@ export default function TryoutPage() {
     }
   }
 
+  function updatePlayer(updated: Player) {
+    setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setSelectedPlayer(updated);
+  }
+
   function saveEntry(entry: Entry) {
     if (!selectedPlayer) return;
     const key = String(selectedPlayer.id);
@@ -897,6 +1001,7 @@ export default function TryoutPage() {
           entries={selectedEntries}
           onAddEval={() => setEditingEntry("new")}
           onEditEval={(entry) => setEditingEntry(entry)}
+          onUpdatePlayer={updatePlayer}
           onBack={() => setSelectedPlayer(null)}
         />
       )}
