@@ -1,11 +1,30 @@
-const STORAGE_KEY = "coachUnlocked";
+const TOKEN_KEY = "coachToken";
 const UNLOCK_EVENT = "coachUnlockChanged";
 
 const AUTH_URL = process.env.NEXT_PUBLIC_COACH_AUTH_URL ?? "";
 
+function readToken(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  const expiresAt = Number(token.split(".")[0]);
+  if (!expiresAt || Date.now() >= expiresAt) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
+}
+
 export function isCoachUnlocked(): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(STORAGE_KEY) === "1";
+  return readToken() !== null;
+}
+
+// The signed token proving coach access, to be sent with any request for
+// coach-only data (player/parent profiles, birth certificates). The Sheets
+// Apps Script backend verifies it server-side — it is not just a client-side
+// flag. Returns null if the coach hasn't unlocked or the token has expired.
+export function getCoachToken(): string | null {
+  return readToken();
 }
 
 export async function tryUnlockCoach(password: string): Promise<boolean> {
@@ -20,8 +39,8 @@ export async function tryUnlockCoach(password: string): Promise<boolean> {
       body: JSON.stringify({ password }),
     });
     const data = await res.json();
-    if (data.ok) {
-      sessionStorage.setItem(STORAGE_KEY, "1");
+    if (data.ok && data.token) {
+      sessionStorage.setItem(TOKEN_KEY, data.token);
       window.dispatchEvent(new Event(UNLOCK_EVENT));
       return true;
     }
