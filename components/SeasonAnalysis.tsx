@@ -897,7 +897,7 @@ export default function SeasonAnalysis() {
 
           {/* Trends view */}
           {view === "trends" && !selectedGame && (
-            <TrendsView atBats={filteredAtBats} games={filteredGames} />
+            <TrendsView games={filteredGames} batting={filteredBatting} pitching={filteredPitching} />
           )}
         </>
       )}
@@ -915,120 +915,128 @@ export default function SeasonAnalysis() {
 
 // ── Trends view ───────────────────────────────────────────────────────────────
 
-function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] }) {
-  const [playerFilter, setPlayerFilter] = useState("");
-
-  if (atBats.length === 0) {
+function TrendsView({ games, batting, pitching }: { games: Game[]; batting: BattingRow[]; pitching: PitchingRow[] }) {
+  if (games.length === 0) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/3 p-8 text-center text-white/30 text-sm">
-        No at-bat data yet. Drop a GC scorebook PDF alongside a box score to enable trends.
+        No games yet.
       </div>
     );
   }
 
-  const teamAbs = atBats.filter(ab => ab.Team === "our");
-  const players = Array.from(new Set(teamAbs.map(ab => ab.Player))).sort();
-  const filtered = playerFilter
-    ? teamAbs.filter(ab => ab.Player.toLowerCase().includes(playerFilter.toLowerCase()))
-    : teamAbs;
+  // Sort games chronologically
+  const sorted = [...games].sort((a, b) => a.Date.localeCompare(b.Date));
+  const maxRuns = Math.max(...sorted.map(g => Math.max(n(g.TeamScore), n(g.OppScore))), 1);
 
-  // Per-player count stats
-  const playerStats = players
-    .filter(p => !playerFilter || p.toLowerCase().includes(playerFilter.toLowerCase()))
-    .map(player => {
-      const abs = filtered.filter(ab => ab.Player === player);
-      const total = abs.length;
-      if (!total) return null;
+  // Per-player batting aggregates
+  const batters: Record<string, { ab: number; h: number; rbi: number; sb: number; hr: number; bb: number; so: number }> = {};
+  batting.forEach(r => {
+    if (!batters[r.Player]) batters[r.Player] = { ab: 0, h: 0, rbi: 0, sb: 0, hr: 0, bb: 0, so: 0 };
+    const b = batters[r.Player];
+    b.ab += n(r.AB); b.h += n(r.H); b.rbi += n(r.RBI); b.sb += n(r.SB);
+    b.hr += n(r.HR); b.bb += n(r.BB); b.so += n(r.SO);
+  });
+  const batterList = Object.entries(batters)
+    .filter(([, b]) => b.ab >= 3)
+    .map(([player, b]) => ({ player, ...b, average: b.ab ? b.h / b.ab : 0 }));
 
-      // Count-based breakdowns
-      const ahead = abs.filter(ab => Number(ab.Balls) < Number(ab.Strikes));
-      const behind = abs.filter(ab => Number(ab.Balls) > Number(ab.Strikes));
-      const even = abs.filter(ab => Number(ab.Balls) === Number(ab.Strikes));
+  const topAvg = [...batterList].sort((a, b) => b.average - a.average).slice(0, 5);
+  const topRbi = [...batterList].sort((a, b) => b.rbi - a.rbi).slice(0, 5);
+  const topSb  = [...batterList].sort((a, b) => b.sb - a.sb).filter(b => b.sb > 0).slice(0, 5);
 
-      // Result buckets
-      const K = (arr: AtBatRecord[]) => arr.filter(ab => /K|SO/.test(ab.Result)).length;
-      const BB = (arr: AtBatRecord[]) => arr.filter(ab => /BB|W/.test(ab.Result)).length;
-      const H = (arr: AtBatRecord[]) => arr.filter(ab => /^(1B|2B|3B|HR|H)/.test(ab.Result)).length;
-      const pct = (num: number, den: number) => den ? Math.round((num / den) * 100) + "%" : "—";
+  // Per-player pitching aggregates
+  const pitchers: Record<string, { ip: number; er: number; so: number; bb: number; h: number }> = {};
+  pitching.forEach(r => {
+    if (!pitchers[r.Player]) pitchers[r.Player] = { ip: 0, er: 0, so: 0, bb: 0, h: 0 };
+    const p = pitchers[r.Player];
+    p.ip += n(r.IP); p.er += n(r.ER); p.so += n(r.SO); p.bb += n(r.BB); p.h += n(r.H);
+  });
+  const pitcherList = Object.entries(pitchers)
+    .filter(([, p]) => p.ip >= 1)
+    .map(([player, p]) => ({ player, ...p, eraVal: p.ip ? (p.er / p.ip) * 7 : 99 }));
 
-      // Hit direction
-      const hitAbs = abs.filter(ab => /^(1B|2B|3B|HR|H|G|F|L)/.test(ab.Result) && Number(ab.FieldedTo) > 0);
-      const pull = hitAbs.filter(ab => [5,6,7].includes(Number(ab.FieldedTo))).length;
-      const center = hitAbs.filter(ab => [1,2,8].includes(Number(ab.FieldedTo))).length;
-      const oppo = hitAbs.filter(ab => [3,4,9].includes(Number(ab.FieldedTo))).length;
+  const topEra = [...pitcherList].sort((a, b) => a.eraVal - b.eraVal).slice(0, 5);
+  const topKs  = [...pitcherList].sort((a, b) => b.so - a.so).slice(0, 5);
 
-      return { player, total, ahead, behind, even, kFn: K, hFn: H, pull, center, oppo, hitAbs: hitAbs.length };
-    }).filter(Boolean) as NonNullable<{ player: string; total: number; ahead: AtBatRecord[]; behind: AtBatRecord[]; even: AtBatRecord[]; kFn: (a: AtBatRecord[]) => number; hFn: (a: AtBatRecord[]) => number; pull: number; center: number; oppo: number; hitAbs: number }[]>[number][];
-
-  const pct = (num: number, den: number) => den ? Math.round((num / den) * 100) + "%" : "—";
+  const fmtAvg = (v: number) => v.toFixed(3).replace(/^0/, "");
+  const fmtEra = (v: number) => v === 99 ? "—" : v.toFixed(2);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-2 items-center flex-wrap">
-        <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
-          className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-40" />
-        <span className="text-xs text-white/30">{filtered.length} at-bats</span>
-      </div>
+    <div className="flex flex-col gap-6">
 
-      {/* Count performance table */}
+      {/* Game-by-game results */}
       <div>
-        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Performance by Count</p>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="text-xs w-full">
-            <thead><tr className="bg-white/5 text-white/40">
-              <th className="text-left px-3 py-2 font-semibold">Player</th>
-              <th className="px-3 py-2 font-semibold text-right">PA</th>
-              <th className="px-3 py-2 font-semibold text-right">Ahead K%</th>
-              <th className="px-3 py-2 font-semibold text-right">Ahead H%</th>
-              <th className="px-3 py-2 font-semibold text-right">Behind K%</th>
-              <th className="px-3 py-2 font-semibold text-right">Behind H%</th>
-              <th className="px-3 py-2 font-semibold text-right">Even K%</th>
-              <th className="px-3 py-2 font-semibold text-right">Even H%</th>
-            </tr></thead>
-            <tbody>
-              {playerStats.map((r, i) => (
-                <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
-                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
-                  <td className="px-3 py-2 text-white/70 text-right">{r.total}</td>
-                  <td className="px-3 py-2 text-right text-green-400/80">{pct(r.kFn(r.ahead), r.ahead.length)}</td>
-                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.ahead), r.ahead.length)}</td>
-                  <td className="px-3 py-2 text-right text-red-400/80">{pct(r.kFn(r.behind), r.behind.length)}</td>
-                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.behind), r.behind.length)}</td>
-                  <td className="px-3 py-2 text-right text-white/50">{pct(r.kFn(r.even), r.even.length)}</td>
-                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.even), r.even.length)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-3">Game Results</p>
+        <div className="flex flex-col gap-1">
+          {sorted.map(g => {
+            const ts = n(g.TeamScore), os = n(g.OppScore);
+            const w = ts > os, l = ts < os;
+            const tsBar = Math.round((ts / maxRuns) * 100);
+            const osBar = Math.round((os / maxRuns) * 100);
+            return (
+              <div key={g.Id} className="flex items-center gap-3 text-xs">
+                <span className={`w-4 font-bold text-center ${w ? "text-green-400" : l ? "text-red-400" : "text-white/40"}`}>{w ? "W" : l ? "L" : "T"}</span>
+                <span className="text-white/40 w-20 shrink-0 truncate">{g.Opponent.replace(/\s*12U.*$/i, "")}</span>
+                <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 rounded-sm bg-accent/70" style={{ width: `${tsBar}%` }} />
+                    <span className="text-white/70 font-semibold w-4 text-right">{ts}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 rounded-sm bg-white/20" style={{ width: `${osBar}%` }} />
+                    <span className="text-white/30 w-4 text-right">{os}</span>
+                  </div>
+                </div>
+                <span className="text-white/20 w-14 text-right shrink-0">{formatDate(g.Date)}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Hit direction table */}
-      <div>
-        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Hit Direction</p>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="text-xs w-full">
-            <thead><tr className="bg-white/5 text-white/40">
-              <th className="text-left px-3 py-2 font-semibold">Player</th>
-              <th className="px-3 py-2 font-semibold text-right">Hits</th>
-              <th className="px-3 py-2 font-semibold text-right">Pull%</th>
-              <th className="px-3 py-2 font-semibold text-right">Center%</th>
-              <th className="px-3 py-2 font-semibold text-right">Oppo%</th>
-            </tr></thead>
-            <tbody>
-              {playerStats.filter(r => r.hitAbs > 0).map((r, i) => (
-                <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
-                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
-                  <td className="px-3 py-2 text-white/70 text-right">{r.hitAbs}</td>
-                  <td className="px-3 py-2 text-right text-accent">{pct(r.pull, r.hitAbs)}</td>
-                  <td className="px-3 py-2 text-right text-white/60">{pct(r.center, r.hitAbs)}</td>
-                  <td className="px-3 py-2 text-right text-blue-400/80">{pct(r.oppo, r.hitAbs)}</td>
-                </tr>
+      {/* Batting leaders */}
+      <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+        {[
+          { label: "Batting Avg", leaders: topAvg, val: (r: typeof topAvg[0]) => fmtAvg(r.average) },
+          { label: "RBI Leaders", leaders: topRbi, val: (r: typeof topRbi[0]) => String(r.rbi) },
+          { label: "Stolen Bases", leaders: topSb,  val: (r: typeof topSb[0])  => String(r.sb) },
+        ].map(({ label, leaders, val }) => (
+          <div key={label} className="rounded-xl border border-white/10 bg-white/3 p-3">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">{label}</p>
+            <div className="flex flex-col gap-1.5">
+              {leaders.length === 0 && <span className="text-xs text-white/20">—</span>}
+              {leaders.map((r, i) => (
+                <div key={r.player} className="flex items-center gap-2">
+                  <span className="text-white/20 text-xs w-3">{i + 1}</span>
+                  <span className="text-sm font-semibold flex-1 truncate">{r.player}</span>
+                  <span className="text-accent font-bold text-sm">{val(r as any)}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-white/20 mt-2">Pull = positions 5–7 (left side), Center = 1,2,8, Oppo = 3,4,9 (right side)</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pitching leaders */}
+      <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+        {[
+          { label: "ERA Leaders", leaders: topEra, val: (r: typeof topEra[0]) => fmtEra(r.eraVal) },
+          { label: "Strikeout Leaders", leaders: topKs, val: (r: typeof topKs[0]) => String(r.so) },
+        ].map(({ label, leaders, val }) => (
+          <div key={label} className="rounded-xl border border-white/10 bg-white/3 p-3">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">{label}</p>
+            <div className="flex flex-col gap-1.5">
+              {leaders.length === 0 && <span className="text-xs text-white/20">—</span>}
+              {leaders.map((r, i) => (
+                <div key={r.player} className="flex items-center gap-2">
+                  <span className="text-white/20 text-xs w-3">{i + 1}</span>
+                  <span className="text-sm font-semibold flex-1 truncate">{r.player}</span>
+                  <span className="text-accent font-bold text-sm">{val(r as any)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
