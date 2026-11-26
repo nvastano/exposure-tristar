@@ -9,6 +9,7 @@ import LogoLoader from "@/components/LogoLoader";
 import { sheetsGet, sheetsPost } from "@/lib/sheets";
 import AssignedWorkCoach from "@/components/AssignedWorkCoach";
 import PracticeAttendance from "@/components/PracticeAttendance";
+import SeasonAnalysis from "@/components/SeasonAnalysis";
 
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
@@ -16,6 +17,7 @@ const PracticeStats = dynamic(() => import("@/app/practice/page"), { ssr: false,
 
 const TABS = [
   { id: "roster", label: "Roster Profiles" },
+  { id: "season", label: "Season Analysis" },
   { id: "plan", label: "Practice Plan" },
   { id: "stats", label: "Practice Stats" },
   { id: "assigned", label: "Assigned Work" },
@@ -377,6 +379,7 @@ function CoachesInner() {
 
       {/* Tab content */}
       {tab === "roster" && <RosterProfiles />}
+      {tab === "season" && <SeasonAnalysis />}
       {tab === "plan" && <PracticePlan />}
       {tab === "stats" && <PracticeStats />}
       {tab === "assigned" && <AssignedWorkCoach />}

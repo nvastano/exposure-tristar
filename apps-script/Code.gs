@@ -410,6 +410,14 @@ function doGet(e) {
       });
     }
     result = allAssignments;
+  } else if (action === "games") {
+    result = rowsToObjects_(getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]).getDataRange().getValues());
+  } else if (action === "gameBatting") {
+    var gb = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
+    result = rowsToObjects_(gb.getDataRange().getValues());
+  } else if (action === "gamePitching") {
+    var gp = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
+    result = rowsToObjects_(gp.getDataRange().getValues());
   } else if (action === "practiceSessions") {
     var psSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
     backfillIds_(psSheet);
@@ -1309,6 +1317,81 @@ function doPost(e) {
       if (body.throwVelo !== undefined) teUpdates.ThrowVelo = body.throwVelo;
       if (body.notes !== undefined) teUpdates.Notes = body.notes;
       setRowByHeaders_(teSheet, teRow, teUpdates);
+    }
+    result = { ok: true };
+  } else if (body.action === "saveGame") {
+    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]);
+    // If gameId provided, check for duplicate
+    var existingGameId = body.gameId || null;
+    if (existingGameId) {
+      var gRows = rowsToObjects_(gSheet.getDataRange().getValues());
+      var existing = gRows.filter(function(r) { return r.Id === existingGameId; });
+      if (existing.length > 0) {
+        // Delete existing batting/pitching rows for this game, then re-add
+        var gbSheet = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
+        var gpSheet = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
+        // Delete batting rows
+        var gbData = gbSheet.getDataRange().getValues();
+        var gbIdCol = gbData[0].indexOf("GameId");
+        for (var i = gbData.length - 1; i >= 1; i--) {
+          if (gbData[i][gbIdCol] === existingGameId) gbSheet.deleteRow(i + 1);
+        }
+        // Delete pitching rows
+        var gpData = gpSheet.getDataRange().getValues();
+        var gpIdCol = gpData[0].indexOf("GameId");
+        for (var i = gpData.length - 1; i >= 1; i--) {
+          if (gpData[i][gpIdCol] === existingGameId) gpSheet.deleteRow(i + 1);
+        }
+        // Update the game row
+        var gameRowIdx = -1;
+        var gData = gSheet.getDataRange().getValues();
+        var gIdCol = gData[0].indexOf("Id");
+        for (var i = 1; i < gData.length; i++) {
+          if (gData[i][gIdCol] === existingGameId) { gameRowIdx = i + 1; break; }
+        }
+        if (gameRowIdx > 0) {
+          setRowByHeaders_(gSheet, gameRowIdx, { Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "" });
+        }
+        result = { ok: true, gameId: existingGameId, updated: true };
+      } else {
+        existingGameId = null; // fall through to insert
+      }
+    }
+    if (!existingGameId) {
+      var newGameId = newId_();
+      appendRowByHeaders_(gSheet, { Id: newGameId, Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "" });
+      existingGameId = newGameId;
+      result = { ok: true, gameId: newGameId, updated: false };
+    }
+    // Insert batting rows
+    var gbSheet2 = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
+    (body.batting || []).forEach(function(b) {
+      appendRowByHeaders_(gbSheet2, { Id: newId_(), GameId: existingGameId, Player: b.player, AB: b.ab, R: b.r, H: b.h, RBI: b.rbi, BB: b.bb, SO: b.so, doubles: b.doubles || 0, triples: b.triples || 0, HR: b.hr || 0, SB: b.sb || 0, HBP: b.hbp || 0, SAC: b.sac || 0 });
+    });
+    // Insert pitching rows
+    var gpSheet2 = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
+    (body.pitching || []).forEach(function(p) {
+      appendRowByHeaders_(gpSheet2, { Id: newId_(), GameId: existingGameId, Player: p.player, IP: p.ip, H: p.h, R: p.r, ER: p.er, BB: p.bb, SO: p.so, HR: p.hr || 0, BF: p.bf || 0, PC: p.pc || 0, Strikes: p.strikes || 0, W: p.w || 0, L: p.l || 0, SV: p.sv || 0 });
+    });
+    result = result || { ok: true, gameId: existingGameId };
+  } else if (body.action === "deleteGame") {
+    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]);
+    var gData = gSheet.getDataRange().getValues();
+    var gIdCol = gData[0].indexOf("Id");
+    for (var i = gData.length - 1; i >= 1; i--) {
+      if (gData[i][gIdCol] === body.gameId) { gSheet.deleteRow(i + 1); break; }
+    }
+    var gbSheet = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
+    var gbData = gbSheet.getDataRange().getValues();
+    var gbIdCol = gbData[0].indexOf("GameId");
+    for (var i = gbData.length - 1; i >= 1; i--) {
+      if (gbData[i][gbIdCol] === body.gameId) gbSheet.deleteRow(i + 1);
+    }
+    var gpSheet = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
+    var gpData = gpSheet.getDataRange().getValues();
+    var gpIdCol = gpData[0].indexOf("GameId");
+    for (var i = gpData.length - 1; i >= 1; i--) {
+      if (gpData[i][gpIdCol] === body.gameId) gpSheet.deleteRow(i + 1);
     }
     result = { ok: true };
   } else if (body.action === "logFundraiserSale") {
