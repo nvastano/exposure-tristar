@@ -411,13 +411,16 @@ function doGet(e) {
     }
     result = allAssignments;
   } else if (action === "games") {
-    result = rowsToObjects_(getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]).getDataRange().getValues());
+    result = rowsToObjects_(getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes","Highlights","Recap"]).getDataRange().getValues());
   } else if (action === "gameBatting") {
     var gb = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
     result = rowsToObjects_(gb.getDataRange().getValues());
   } else if (action === "gamePitching") {
     var gp = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
     result = rowsToObjects_(gp.getDataRange().getValues());
+  } else if (action === "gameAtBats") {
+    var ga = getSheet_("GameAtBats", ["Id","GameId","Team","Player","Jersey","Inning","Result","Balls","Strikes","FieldedTo"]);
+    result = rowsToObjects_(ga.getDataRange().getValues());
   } else if (action === "practiceSessions") {
     var psSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
     backfillIds_(psSheet);
@@ -1320,7 +1323,7 @@ function doPost(e) {
     }
     result = { ok: true };
   } else if (body.action === "saveGame") {
-    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]);
+    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes","Highlights","Recap"]);
     // If gameId provided, check for duplicate
     var existingGameId = body.gameId || null;
     if (existingGameId) {
@@ -1350,7 +1353,7 @@ function doPost(e) {
           if (gData[i][gIdCol] === existingGameId) { gameRowIdx = i + 1; break; }
         }
         if (gameRowIdx > 0) {
-          setRowByHeaders_(gSheet, gameRowIdx, { Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "" });
+          setRowByHeaders_(gSheet, gameRowIdx, { Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "", Highlights: JSON.stringify(body.highlights || []), Recap: body.recap || "" });
         }
         result = { ok: true, gameId: existingGameId, updated: true };
       } else {
@@ -1359,7 +1362,7 @@ function doPost(e) {
     }
     if (!existingGameId) {
       var newGameId = newId_();
-      appendRowByHeaders_(gSheet, { Id: newGameId, Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "" });
+      appendRowByHeaders_(gSheet, { Id: newGameId, Date: body.date, Opponent: body.opponent, HomeAway: body.homeAway, TeamScore: body.teamScore, OppScore: body.oppScore, Notes: body.notes || "", Highlights: JSON.stringify(body.highlights || []), Recap: body.recap || "" });
       existingGameId = newGameId;
       result = { ok: true, gameId: newGameId, updated: false };
     }
@@ -1374,8 +1377,20 @@ function doPost(e) {
       appendRowByHeaders_(gpSheet2, { Id: newId_(), GameId: existingGameId, Player: p.player, IP: p.ip, H: p.h, R: p.r, ER: p.er, BB: p.bb, SO: p.so, HR: p.hr || 0, BF: p.bf || 0, PC: p.pc || 0, Strikes: p.strikes || 0, W: p.w || 0, L: p.l || 0, SV: p.sv || 0 });
     });
     result = result || { ok: true, gameId: existingGameId };
+  } else if (body.action === "saveGameAtBats") {
+    var gaSheet = getSheet_("GameAtBats", ["Id","GameId","Team","Player","Jersey","Inning","Result","Balls","Strikes","FieldedTo"]);
+    // Delete existing at-bats for this game
+    var gaData = gaSheet.getDataRange().getValues();
+    var gaIdCol = gaData[0].indexOf("GameId");
+    for (var i = gaData.length - 1; i >= 1; i--) {
+      if (gaData[i][gaIdCol] === body.gameId) gaSheet.deleteRow(i + 1);
+    }
+    (body.atBats || []).forEach(function(ab) {
+      appendRowByHeaders_(gaSheet, { Id: newId_(), GameId: body.gameId, Team: ab.team, Player: ab.player, Jersey: ab.jersey, Inning: ab.inning, Result: ab.result, Balls: ab.balls, Strikes: ab.strikes, FieldedTo: ab.fieldedTo || 0 });
+    });
+    result = { ok: true };
   } else if (body.action === "deleteGame") {
-    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes"]);
+    var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes","Highlights","Recap"]);
     var gData = gSheet.getDataRange().getValues();
     var gIdCol = gData[0].indexOf("Id");
     for (var i = gData.length - 1; i >= 1; i--) {
@@ -1392,6 +1407,12 @@ function doPost(e) {
     var gpIdCol = gpData[0].indexOf("GameId");
     for (var i = gpData.length - 1; i >= 1; i--) {
       if (gpData[i][gpIdCol] === body.gameId) gpSheet.deleteRow(i + 1);
+    }
+    var gaSheet2 = getSheet_("GameAtBats", ["Id","GameId","Team","Player","Jersey","Inning","Result","Balls","Strikes","FieldedTo"]);
+    var gaData2 = gaSheet2.getDataRange().getValues();
+    var gaIdCol2 = gaData2[0].indexOf("GameId");
+    for (var i = gaData2.length - 1; i >= 1; i--) {
+      if (gaData2[i][gaIdCol2] === body.gameId) gaSheet2.deleteRow(i + 1);
     }
     result = { ok: true };
   } else if (body.action === "logFundraiserSale") {

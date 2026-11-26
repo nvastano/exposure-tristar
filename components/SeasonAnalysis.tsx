@@ -7,6 +7,15 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 type Game = {
   Id: string; Date: string; Opponent: string; HomeAway: string;
   TeamScore: string; OppScore: string; Notes: string;
+  Highlights?: string; Recap?: string;
+};
+type AtBat = {
+  team: "our" | "opp"; player: string; jersey: number; inning: number;
+  result: string; balls: number; strikes: number; fieldedTo: number;
+};
+type AtBatRecord = {
+  Id: string; GameId: string; Team: string; Player: string; Jersey: string;
+  Inning: string; Result: string; Balls: string; Strikes: string; FieldedTo: string;
 };
 type BattingRow = {
   Id: string; GameId: string; Player: string;
@@ -23,6 +32,7 @@ type ParsedGame = {
   date: string; opponent: string; homeAway: string;
   teamScore: number; oppScore: number; notes: string;
   batting: ParsedBatter[]; pitching: ParsedPitcher[];
+  highlights?: string[]; recap?: string;
   gameId?: string;
 };
 type ParsedBatter = { player: string; ab: number; r: number; h: number; rbi: number; bb: number; so: number; doubles: number; triples: number; hr: number; sb: number; hbp: number; sac: number; };
@@ -161,6 +171,165 @@ function playerMatchesAny(player: string, names: string[]): boolean {
   return names.some(n => n.toLowerCase().includes(last) && last.length > 2);
 }
 
+// ── Scorebook PDF parser ──────────────────────────────────────────────────────
+
+function detectInningColumns(lines: string[]): number[] | null {
+  for (const line of lines) {
+    // Look for a line with digit headers 1-9 spaced ≥3 chars apart after col 15
+    const m = line.match(/^.{15,}(\s+\d\s+){5,}/);
+    if (!m) continue;
+    const cols: number[] = [];
+    // Find positions of standalone digits 1-9
+    let re = /\b([1-9])\b/g;
+    let match;
+    while ((match = re.exec(line)) !== null) {
+      const col = match.index;
+      if (col >= 15) cols.push(col);
+    }
+    if (cols.length >= 6) return cols;
+  }
+  return null;
+}
+
+function colToInning(pos: number, cols: number[]): number {
+  let best = 0; let bestDist = 9999;
+  cols.forEach((c, i) => {
+    const d = Math.abs(pos - c);
+    if (d < bestDist) { bestDist = d; best = i + 1; }
+  });
+  return best;
+}
+
+function hitDirection(fieldedTo: number): "pull" | "center" | "oppo" {
+  if ([5, 6, 7].includes(fieldedTo)) return "pull";   // left side for RHH
+  if ([3, 4, 9].includes(fieldedTo)) return "oppo";   // right side for RHH
+  return "center";
+}
+
+function parseScoreBookPdf(raw: string): AtBat[] {
+  const lines = raw.split("\n");
+  const atBats: AtBat[] = [];
+
+  let inningCols: number[] | null = null;
+  let currentTeam: "our" | "opp" = "opp";
+  let playerName = "";
+  let playerJersey = 0;
+
+  // Track per-at-bat state: accumulate result, ball/strike lines by column
+  // We collect batter blocks: starts with #jersey result line(s)
+  type AbBlock = { inning: number; result: string; bLines: string[]; sLines: string[] };
+  const pendingBlocks: AbBlock[] = [];
+
+  function flushBlock(block: AbBlock) {
+    // Count B and S from sequences like "B 1 2" or "S 3 4 5"
+    let balls = 0; let strikes = 0; let fieldedTo = 0;
+
+    for (const bl of block.bLines) {
+      const nums = bl.trim().split(/\s+/);
+      balls += nums.length;
+    }
+    for (const sl of block.sLines) {
+      const nums = sl.trim().split(/\s+/);
+      strikes += nums.length;
+    }
+
+    // Extract fielder position from result (e.g. "G3" → 3, "F7" → 7, "L4" → 4, "K" → 0)
+    const fieldM = block.result.match(/[GFL](\d)/);
+    if (fieldM) fieldedTo = parseInt(fieldM[1]);
+
+    if (playerName && block.result) {
+      atBats.push({
+        team: currentTeam, player: playerName, jersey: playerJersey,
+        inning: block.inning, result: block.result,
+        balls, strikes, fieldedTo,
+      });
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Detect team section headers
+    if (/team elite/i.test(line) && /home|away/i.test(line)) {
+      currentTeam = "our"; pendingBlocks.length = 0; playerName = ""; continue;
+    }
+    if (/smoke|opponent|away/i.test(line) && !currentTeam && i < 20) {
+      currentTeam = "opp"; continue;
+    }
+    // Reset for second team section
+    if (/team elite/i.test(line) && inningCols) {
+      currentTeam = "our"; pendingBlocks.length = 0; playerName = "";
+    }
+
+    // Detect inning column header line
+    if (!inningCols) {
+      const cols = detectInningColumns([line]);
+      if (cols) { inningCols = cols; continue; }
+    }
+
+    if (!inningCols) continue;
+
+    // Player name line: "45   G. M        3B"  — jersey first, then initial + last
+    const playerLineM = line.match(/^\s{0,4}(\d{1,2})\s{2,}([A-Z]\.\s+\S+)\s+\S{1,3}\s*$/);
+    if (playerLineM) {
+      playerJersey = parseInt(playerLineM[1]);
+      playerName = playerLineM[2].replace(/\s+/g, " ").trim();
+      continue;
+    }
+
+    // At-bat result line: "#45   G   [gap]   #32   L" — jersey+result at column positions
+    const abLineM = line.match(/#\d{1,2}\s+[A-Z0-9]{1,4}/g);
+    if (abLineM) {
+      // For each match, find its column position and map to inning
+      let re2 = /#(\d{1,2})\s+([A-Z0-9]{1,4})/g;
+      let m2;
+      while ((m2 = re2.exec(line)) !== null) {
+        const col = m2.index;
+        const inning = colToInning(col, inningCols);
+        pendingBlocks.push({ inning, result: m2[2], bLines: [], sLines: [] });
+      }
+      continue;
+    }
+
+    // Ball sequence: "B 1 2 3" at a column position
+    const bLineM = line.match(/^(\s*)B(\s+\d+)+\s*$/);
+    if (bLineM && pendingBlocks.length > 0) {
+      const col = bLineM[1].length;
+      const inning = colToInning(col, inningCols);
+      const block = pendingBlocks.find(b => b.inning === inning);
+      if (block) {
+        const nums = line.trim().replace(/^B\s*/, "").trim();
+        block.bLines.push(nums);
+      }
+      continue;
+    }
+
+    // Strike sequence: "S 4 5" at a column position
+    const sLineM = line.match(/^(\s*)S(\s+\d+)+\s*$/);
+    if (sLineM && pendingBlocks.length > 0) {
+      const col = sLineM[1].length;
+      const inning = colToInning(col, inningCols);
+      const block = pendingBlocks.find(b => b.inning === inning);
+      if (block) {
+        const nums = line.trim().replace(/^S\s*/, "").trim();
+        block.sLines.push(nums);
+      }
+      continue;
+    }
+
+    // Blank line or new player = flush pending blocks
+    if (!line.trim() && pendingBlocks.length > 0) {
+      pendingBlocks.forEach(flushBlock);
+      pendingBlocks.length = 0;
+    }
+  }
+
+  // Flush any remaining
+  pendingBlocks.forEach(flushBlock);
+
+  return atBats;
+}
+
 // ── PDF.js loader ─────────────────────────────────────────────────────────────
 
 async function extractTextFromPdf(file: File): Promise<string> {
@@ -227,31 +396,39 @@ export default function SeasonAnalysis() {
   const [games, setGames] = useState<Game[]>([]);
   const [batting, setBatting] = useState<BattingRow[]>([]);
   const [pitching, setPitching] = useState<PitchingRow[]>([]);
+  const [dbAtBats, setDbAtBats] = useState<AtBatRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"log" | "batting" | "pitching" | "game">("log");
+  const [view, setView] = useState<"log" | "batting" | "pitching" | "trends" | "game">("log");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
 
   // PDF upload state
   const [dragging, setDragging] = useState(false);
+  const [draggingScorebook, setDraggingScorebook] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedGame | null>(null);
+  const [parsedAtBats, setParsedAtBats] = useState<AtBat[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [parseError, setParseError] = useState("");
+  const [highlights, setHighlights] = useState<string[]>([""]);
+  const [recap, setRecap] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const scorebookRef = useRef<HTMLInputElement>(null);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [g, b, p] = await Promise.all([
+      const [g, b, p, ga] = await Promise.all([
         sheetsGet("games") as Promise<Game[]>,
         sheetsGet("gameBatting") as Promise<BattingRow[]>,
         sheetsGet("gamePitching") as Promise<PitchingRow[]>,
+        sheetsGet("gameAtBats") as Promise<AtBatRecord[]>,
       ]);
       setGames(g.sort((a, b) => a.Date > b.Date ? 1 : -1));
       setBatting(b);
       setPitching(p);
+      setDbAtBats(ga);
     } finally {
       setLoading(false);
     }
@@ -263,7 +440,7 @@ export default function SeasonAnalysis() {
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".pdf")) { setParseError("Please upload a PDF file."); return; }
-    setParseError(""); setParsed(null); setSaveMsg("");
+    setParseError(""); setParsed(null); setSaveMsg(""); setHighlights([""]); setRecap("");
     setParsing(true);
     try {
       const text = await extractTextFromPdf(file);
@@ -272,9 +449,24 @@ export default function SeasonAnalysis() {
         setParseError("Couldn't parse batting/pitching from this PDF. Make sure it's the GC box score PDF (not the scorebook).");
       } else {
         setParsed(result);
+        setParsedAtBats([]);
       }
     } catch (e: any) {
       setParseError("Error reading PDF: " + e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function handleScorebookFile(file: File) {
+    if (!file.name.endsWith(".pdf")) return;
+    setParsing(true);
+    try {
+      const text = await extractTextFromPdf(file);
+      const atBats = parseScoreBookPdf(text);
+      setParsedAtBats(atBats);
+    } catch (e: any) {
+      setParseError("Error reading scorebook: " + e.message);
     } finally {
       setParsing(false);
     }
@@ -286,13 +478,25 @@ export default function SeasonAnalysis() {
     if (file) handleFile(file);
   }, []);
 
+  const onDropScorebook = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setDraggingScorebook(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleScorebookFile(file);
+  }, [parsed]);
+
   async function saveGame() {
     if (!parsed) return;
     setSaving(true); setSaveMsg("");
     try {
-      const res = await sheetsPost("saveGame", parsed) as any;
+      const validHighlights = highlights.filter(h => h.trim());
+      const payload = { ...parsed, highlights: validHighlights, recap };
+      const res = await sheetsPost("saveGame", payload) as any;
+      const gameId = res.gameId;
+      if (parsedAtBats.length > 0 && gameId) {
+        await sheetsPost("saveGameAtBats", { gameId, atBats: parsedAtBats });
+      }
       setSaveMsg(res.updated ? "Game updated!" : "Game saved!");
-      setParsed(null);
+      setParsed(null); setParsedAtBats([]); setHighlights([""]); setRecap("");
       await loadData();
     } catch (e: any) {
       setSaveMsg("Error saving: " + e.message);
@@ -392,15 +596,64 @@ export default function SeasonAnalysis() {
                   {parsed.teamScore > parsed.oppScore ? "W" : "L"}
                 </span>
               </p>
-              <p className="text-xs text-white/40 mt-0.5">{parsed.date} · {parsed.batting.length} batters · {parsed.pitching.length} pitchers parsed</p>
+              <p className="text-xs text-white/40 mt-0.5">{parsed.date} · {parsed.batting.length} batters · {parsed.pitching.length} pitchers parsed{parsedAtBats.length > 0 ? ` · ${parsedAtBats.length} at-bats` : ""}</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setParsed(null)} className="px-3 py-1.5 rounded border border-white/20 text-white/50 text-sm hover:text-white transition-colors">Cancel</button>
+              <button onClick={() => { setParsed(null); setParsedAtBats([]); setHighlights([""]); setRecap(""); }} className="px-3 py-1.5 rounded border border-white/20 text-white/50 text-sm hover:text-white transition-colors">Cancel</button>
               <button onClick={saveGame} disabled={saving} className="px-4 py-1.5 rounded bg-accent text-white text-sm font-bold hover:bg-accent/80 transition-colors disabled:opacity-50">
                 {saving ? "Saving…" : "Save Game"}
               </button>
             </div>
           </div>
+
+          {/* Highlights links */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Highlight Links</p>
+            {highlights.map((link, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <input
+                  value={link}
+                  onChange={e => { const h = [...highlights]; h[idx] = e.target.value; setHighlights(h); }}
+                  placeholder="Paste GC share link (e.g. https://gc.com/...)"
+                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+                />
+                {highlights.length > 1 && (
+                  <button onClick={() => setHighlights(highlights.filter((_, i) => i !== idx))} className="text-white/30 hover:text-white/70 text-lg leading-none">×</button>
+                )}
+              </div>
+            ))}
+            <button onClick={() => setHighlights([...highlights, ""])} className="text-xs text-accent/70 hover:text-accent text-left">+ Add another link</button>
+          </div>
+
+          {/* Recap */}
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Game Recap</p>
+            <textarea
+              value={recap}
+              onChange={e => setRecap(e.target.value)}
+              rows={3}
+              placeholder="Paste GC-generated game recap text here…"
+              className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 resize-none"
+            />
+          </div>
+
+          {/* Scorebook PDF drop zone */}
+          <div>
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Scorebook PDF <span className="text-white/20 font-normal normal-case">(optional — enables Trends analysis)</span></p>
+            <div
+              onDragOver={e => { e.preventDefault(); setDraggingScorebook(true); }}
+              onDragLeave={() => setDraggingScorebook(false)}
+              onDrop={onDropScorebook}
+              onClick={() => scorebookRef.current?.click()}
+              className={`border border-dashed rounded-lg p-3 cursor-pointer text-center text-xs transition-colors ${
+                draggingScorebook ? "border-accent bg-accent/10 text-white" : parsedAtBats.length > 0 ? "border-green-500/40 bg-green-500/5 text-green-400" : "border-white/15 hover:border-white/30 text-white/30"
+              }`}
+            >
+              <input ref={scorebookRef} type="file" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleScorebookFile(f); e.target.value = ""; }} />
+              {parsedAtBats.length > 0 ? `✓ Scorebook parsed — ${parsedAtBats.length} at-bats` : parsing ? "Parsing…" : "Drop scorebook PDF here or click to browse"}
+            </div>
+          </div>
+
           {/* Quick batting preview */}
           <div className="overflow-x-auto">
             <table className="text-xs w-full">
@@ -440,11 +693,11 @@ export default function SeasonAnalysis() {
           </div>
 
           {/* View tabs */}
-          <div className="flex gap-1 bg-white/5 rounded-lg p-1">
-            {(["log","batting","pitching"] as const).map(v => (
+          <div className="flex gap-1 bg-white/5 rounded-lg p-1 flex-wrap">
+            {(["log","batting","pitching","trends"] as const).map(v => (
               <button key={v} onClick={() => { setView(v); setSelectedGame(null); }}
-                className={`flex-1 text-xs font-bold tracking-wide px-3 py-2 rounded-md transition-colors capitalize ${view === v && !selectedGame ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}>
-                {v === "log" ? "Game Log" : v === "batting" ? "Season Batting" : "Season Pitching"}
+                className={`flex-1 text-xs font-bold tracking-wide px-3 py-2 rounded-md transition-colors capitalize min-w-fit ${view === v && !selectedGame ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}>
+                {v === "log" ? "Game Log" : v === "batting" ? "Season Batting" : v === "pitching" ? "Season Pitching" : "Trends"}
               </button>
             ))}
           </div>
@@ -548,6 +801,11 @@ export default function SeasonAnalysis() {
               </table>
             </div>
           )}
+
+          {/* Trends view */}
+          {view === "trends" && !selectedGame && (
+            <TrendsView atBats={dbAtBats} />
+          )}
         </>
       )}
 
@@ -560,6 +818,136 @@ export default function SeasonAnalysis() {
   );
 }
 
+// ── Trends view ───────────────────────────────────────────────────────────────
+
+function TrendsView({ atBats }: { atBats: AtBatRecord[] }) {
+  const [team, setTeam] = useState<"our" | "opp">("our");
+  const [playerFilter, setPlayerFilter] = useState("");
+
+  if (atBats.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/3 p-8 text-center text-white/30 text-sm">
+        No at-bat data yet. Drop a GC scorebook PDF alongside a box score to enable trends.
+      </div>
+    );
+  }
+
+  const teamAbs = atBats.filter(ab => ab.Team === (team === "our" ? "our" : "opp"));
+  const players = Array.from(new Set(teamAbs.map(ab => ab.Player))).sort();
+  const filtered = playerFilter
+    ? teamAbs.filter(ab => ab.Player.toLowerCase().includes(playerFilter.toLowerCase()))
+    : teamAbs;
+
+  // Per-player count stats
+  const playerStats = players
+    .filter(p => !playerFilter || p.toLowerCase().includes(playerFilter.toLowerCase()))
+    .map(player => {
+      const abs = filtered.filter(ab => ab.Player === player);
+      const total = abs.length;
+      if (!total) return null;
+
+      // Count-based breakdowns
+      const ahead = abs.filter(ab => Number(ab.Balls) < Number(ab.Strikes));
+      const behind = abs.filter(ab => Number(ab.Balls) > Number(ab.Strikes));
+      const even = abs.filter(ab => Number(ab.Balls) === Number(ab.Strikes));
+
+      // Result buckets
+      const K = (arr: AtBatRecord[]) => arr.filter(ab => /K|SO/.test(ab.Result)).length;
+      const BB = (arr: AtBatRecord[]) => arr.filter(ab => /BB|W/.test(ab.Result)).length;
+      const H = (arr: AtBatRecord[]) => arr.filter(ab => /^(1B|2B|3B|HR|H)/.test(ab.Result)).length;
+      const pct = (num: number, den: number) => den ? Math.round((num / den) * 100) + "%" : "—";
+
+      // Hit direction
+      const hitAbs = abs.filter(ab => /^(1B|2B|3B|HR|H|G|F|L)/.test(ab.Result) && Number(ab.FieldedTo) > 0);
+      const pull = hitAbs.filter(ab => [5,6,7].includes(Number(ab.FieldedTo))).length;
+      const center = hitAbs.filter(ab => [1,2,8].includes(Number(ab.FieldedTo))).length;
+      const oppo = hitAbs.filter(ab => [3,4,9].includes(Number(ab.FieldedTo))).length;
+
+      return { player, total, ahead, behind, even, kFn: K, hFn: H, pull, center, oppo, hitAbs: hitAbs.length };
+    }).filter(Boolean) as NonNullable<{ player: string; total: number; ahead: AtBatRecord[]; behind: AtBatRecord[]; even: AtBatRecord[]; kFn: (a: AtBatRecord[]) => number; hFn: (a: AtBatRecord[]) => number; pull: number; center: number; oppo: number; hitAbs: number }[]>[number][];
+
+  const pct = (num: number, den: number) => den ? Math.round((num / den) * 100) + "%" : "—";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2 items-center flex-wrap">
+        <div className="flex gap-1 bg-white/5 rounded-lg p-1">
+          {(["our","opp"] as const).map(t => (
+            <button key={t} onClick={() => setTeam(t)}
+              className={`text-xs font-bold px-4 py-1.5 rounded-md transition-colors ${team === t ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}>
+              {t === "our" ? "Our Team" : "Opponent"}
+            </button>
+          ))}
+        </div>
+        <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
+          className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-40" />
+        <span className="text-xs text-white/30">{filtered.length} at-bats</span>
+      </div>
+
+      {/* Count performance table */}
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Performance by Count</p>
+        <div className="overflow-x-auto rounded-xl border border-white/10">
+          <table className="text-xs w-full">
+            <thead><tr className="bg-white/5 text-white/40">
+              <th className="text-left px-3 py-2 font-semibold">Player</th>
+              <th className="px-3 py-2 font-semibold text-right">PA</th>
+              <th className="px-3 py-2 font-semibold text-right">Ahead K%</th>
+              <th className="px-3 py-2 font-semibold text-right">Ahead H%</th>
+              <th className="px-3 py-2 font-semibold text-right">Behind K%</th>
+              <th className="px-3 py-2 font-semibold text-right">Behind H%</th>
+              <th className="px-3 py-2 font-semibold text-right">Even K%</th>
+              <th className="px-3 py-2 font-semibold text-right">Even H%</th>
+            </tr></thead>
+            <tbody>
+              {playerStats.map((r, i) => (
+                <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
+                  <td className="px-3 py-2 text-white/70 text-right">{r.total}</td>
+                  <td className="px-3 py-2 text-right text-green-400/80">{pct(r.kFn(r.ahead), r.ahead.length)}</td>
+                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.ahead), r.ahead.length)}</td>
+                  <td className="px-3 py-2 text-right text-red-400/80">{pct(r.kFn(r.behind), r.behind.length)}</td>
+                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.behind), r.behind.length)}</td>
+                  <td className="px-3 py-2 text-right text-white/50">{pct(r.kFn(r.even), r.even.length)}</td>
+                  <td className="px-3 py-2 text-right text-accent">{pct(r.hFn(r.even), r.even.length)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Hit direction table */}
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Hit Direction</p>
+        <div className="overflow-x-auto rounded-xl border border-white/10">
+          <table className="text-xs w-full">
+            <thead><tr className="bg-white/5 text-white/40">
+              <th className="text-left px-3 py-2 font-semibold">Player</th>
+              <th className="px-3 py-2 font-semibold text-right">Hits</th>
+              <th className="px-3 py-2 font-semibold text-right">Pull%</th>
+              <th className="px-3 py-2 font-semibold text-right">Center%</th>
+              <th className="px-3 py-2 font-semibold text-right">Oppo%</th>
+            </tr></thead>
+            <tbody>
+              {playerStats.filter(r => r.hitAbs > 0).map((r, i) => (
+                <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
+                  <td className="px-3 py-2 text-white/70 text-right">{r.hitAbs}</td>
+                  <td className="px-3 py-2 text-right text-accent">{pct(r.pull, r.hitAbs)}</td>
+                  <td className="px-3 py-2 text-right text-white/60">{pct(r.center, r.hitAbs)}</td>
+                  <td className="px-3 py-2 text-right text-blue-400/80">{pct(r.oppo, r.hitAbs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-white/20 mt-2">Pull = positions 5–7 (left side), Center = 1,2,8, Oppo = 3,4,9 (right side)</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Game detail view ──────────────────────────────────────────────────────────
 
 function GameDetail({ game, batting, pitching, onBack, onDelete }: {
@@ -568,6 +956,11 @@ function GameDetail({ game, batting, pitching, onBack, onDelete }: {
 }) {
   const w = n(game.TeamScore) > n(game.OppScore);
   const l = n(game.TeamScore) < n(game.OppScore);
+
+  let highlights: string[] = [];
+  try { highlights = game.Highlights ? JSON.parse(game.Highlights) : []; } catch {}
+  highlights = highlights.filter(Boolean);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
@@ -582,6 +975,25 @@ function GameDetail({ game, batting, pitching, onBack, onDelete }: {
         </div>
         <button onClick={onDelete} className="text-xs text-red-400/60 hover:text-red-400 transition-colors">Delete</button>
       </div>
+
+      {highlights.length > 0 && (
+        <div>
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Highlights</p>
+          <div className="flex flex-col gap-1">
+            {highlights.map((link, i) => (
+              <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+                className="text-sm text-accent hover:underline break-all">{link}</a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {game.Recap && (
+        <div>
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Game Recap</p>
+          <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{game.Recap}</p>
+        </div>
+      )}
 
       {batting.length > 0 && (
         <div>
