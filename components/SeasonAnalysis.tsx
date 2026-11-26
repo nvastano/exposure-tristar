@@ -7,7 +7,7 @@ import { sheetsGet, sheetsPost } from "@/lib/sheets";
 type Game = {
   Id: string; Date: string; Opponent: string; HomeAway: string;
   TeamScore: string; OppScore: string; Notes: string;
-  Highlights?: string; Recap?: string;
+  Highlights?: string; Recap?: string; Season?: string;
 };
 type AtBat = {
   team: "our" | "opp"; player: string; jersey: number; inning: number;
@@ -33,7 +33,7 @@ type ParsedGame = {
   teamScore: number; oppScore: number; notes: string;
   batting: ParsedBatter[]; pitching: ParsedPitcher[];
   highlights?: string[]; recap?: string;
-  gameId?: string;
+  gameId?: string; season?: string;
 };
 type ParsedBatter = { player: string; ab: number; r: number; h: number; rbi: number; bb: number; so: number; doubles: number; triples: number; hr: number; sb: number; hbp: number; sac: number; };
 type ParsedPitcher = { player: string; ip: number; h: number; r: number; er: number; bb: number; so: number; hr: number; bf: number; pc: number; strikes: number; w: number; l: number; sv: number; };
@@ -392,6 +392,8 @@ function formatDate(d: string) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const ACTIVE_SEASON = "Fall 2026";
+
 export default function SeasonAnalysis() {
   const [games, setGames] = useState<Game[]>([]);
   const [batting, setBatting] = useState<BattingRow[]>([]);
@@ -401,6 +403,7 @@ export default function SeasonAnalysis() {
   const [view, setView] = useState<"log" | "batting" | "pitching" | "trends" | "game">("log");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
+  const [selectedSeason, setSelectedSeason] = useState(ACTIVE_SEASON);
 
   // PDF upload state
   const [dragging, setDragging] = useState(false);
@@ -489,7 +492,7 @@ export default function SeasonAnalysis() {
     setSaving(true); setSaveMsg("");
     try {
       const validHighlights = highlights.filter(h => h.trim());
-      const payload = { ...parsed, highlights: validHighlights, recap };
+      const payload = { ...parsed, highlights: validHighlights, recap, season: parsed.season || ACTIVE_SEASON };
       const res = await sheetsPost("saveGame", payload) as any;
       const gameId = res.gameId;
       if (parsedAtBats.length > 0 && gameId) {
@@ -512,17 +515,29 @@ export default function SeasonAnalysis() {
     await loadData();
   }
 
+  // ── Season filter ─────────────────────────────────────────────────────────
+
+  const seasons = Array.from(new Set(
+    games.map(g => g.Season || "Fall 2026").filter(Boolean)
+  )).sort().reverse();
+
+  const filteredGames = games.filter(g => (g.Season || "Fall 2026") === selectedSeason);
+  const filteredGameIds = new Set(filteredGames.map(g => g.Id));
+  const filteredBatting = batting.filter(r => filteredGameIds.has(r.GameId));
+  const filteredPitching = pitching.filter(r => filteredGameIds.has(r.GameId));
+  const filteredAtBats = dbAtBats.filter(r => filteredGameIds.has(r.GameId));
+
   // ── Season aggregates ─────────────────────────────────────────────────────
 
-  const wins = games.filter(g => n(g.TeamScore) > n(g.OppScore)).length;
-  const losses = games.filter(g => n(g.TeamScore) < n(g.OppScore)).length;
-  const runsScored = games.reduce((s, g) => s + n(g.TeamScore), 0);
-  const runsAllowed = games.reduce((s, g) => s + n(g.OppScore), 0);
+  const wins = filteredGames.filter(g => n(g.TeamScore) > n(g.OppScore)).length;
+  const losses = filteredGames.filter(g => n(g.TeamScore) < n(g.OppScore)).length;
+  const runsScored = filteredGames.reduce((s, g) => s + n(g.TeamScore), 0);
+  const runsAllowed = filteredGames.reduce((s, g) => s + n(g.OppScore), 0);
 
   // Player season batting totals
-  const players = Array.from(new Set(batting.map(r => r.Player))).sort();
+  const players = Array.from(new Set(filteredBatting.map(r => r.Player))).sort();
   const seasonBatting = players.map(player => {
-    const rows = batting.filter(r => r.Player === player);
+    const rows = filteredBatting.filter(r => r.Player === player);
     const ab = rows.reduce((s, r) => s + n(r.AB), 0);
     const h = rows.reduce((s, r) => s + n(r.H), 0);
     const r2 = rows.reduce((s, r) => s + n(r.R), 0);
@@ -540,9 +555,9 @@ export default function SeasonAnalysis() {
   });
 
   // Player season pitching totals
-  const pitchers = Array.from(new Set(pitching.map(r => r.Player))).sort();
+  const pitchers = Array.from(new Set(filteredPitching.map(r => r.Player))).sort();
   const seasonPitching = pitchers.map(player => {
-    const rows = pitching.filter(r => r.Player === player);
+    const rows = filteredPitching.filter(r => r.Player === player);
     const ip = rows.reduce((s, r) => s + n(r.IP), 0);
     const h = rows.reduce((s, r) => s + n(r.H), 0);
     const r2 = rows.reduce((s, r) => s + n(r.R), 0);
@@ -678,6 +693,21 @@ export default function SeasonAnalysis() {
       {/* Season summary */}
       {games.length > 0 && (
         <>
+          {/* Season picker */}
+          {seasons.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/40 font-semibold tracking-widest uppercase">Season</span>
+              <div className="flex gap-1 flex-wrap">
+                {seasons.map(s => (
+                  <button key={s} onClick={() => { setSelectedSeason(s); setSelectedGame(null); setView("log"); }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedSeason === s ? "bg-accent text-white" : "bg-white/5 text-white/50 hover:text-white hover:bg-white/10"}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-4 gap-3">
             {[
               { label: "Record", value: `${wins}–${losses}` },
@@ -705,7 +735,7 @@ export default function SeasonAnalysis() {
           {/* Game log */}
           {view === "log" && !selectedGame && (
             <div className="flex flex-col gap-2">
-              {games.map(g => {
+              {filteredGames.map(g => {
                 const w = n(g.TeamScore) > n(g.OppScore);
                 const l = n(g.TeamScore) < n(g.OppScore);
                 return (
@@ -804,7 +834,7 @@ export default function SeasonAnalysis() {
 
           {/* Trends view */}
           {view === "trends" && !selectedGame && (
-            <TrendsView atBats={dbAtBats} games={games} />
+            <TrendsView atBats={filteredAtBats} games={filteredGames} />
           )}
         </>
       )}
