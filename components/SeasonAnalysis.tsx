@@ -386,7 +386,7 @@ function era(er: number, ip: number) {
 
 function formatDate(d: string) {
   if (!d) return "";
-  const dt = new Date(d + "T12:00:00");
+  const dt = new Date(d.includes("T") ? d : d + "T12:00:00");
   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
