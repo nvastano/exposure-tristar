@@ -1077,6 +1077,59 @@ function doPost(e) {
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
+  } else if (body.action === "updatePlayerProfile") {
+    // Coach-only edit of an existing family profile (or creating one on the
+    // spot for a player who hasn't submitted the public intake form). The
+    // public logPlayerProfile action above stays ungated since parents use
+    // it without a coach token; this one is for the roster admin view.
+    if (!requireCoach_(body.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      var uppHeaders = ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"];
+      var uppSheet = getSheet_(PLAYER_PROFILES_SHEET, uppHeaders);
+      backfillIds_(uppSheet);
+      var uppRow = body.id ? findRowById_(uppSheet, body.id) : -1;
+      if (uppRow === -1) {
+        // No id (or a stale one) — fall back to matching by player name,
+        // so re-editing right after a profile was just created still works.
+        var uppData = uppSheet.getDataRange().getValues();
+        var uppNameCol = uppData[0].indexOf("Player");
+        var uppTarget = String(body.player || "").trim().toLowerCase();
+        for (var uppI = 1; uppI < uppData.length; uppI++) {
+          if (String(uppData[uppI][uppNameCol]).trim().toLowerCase() === uppTarget) {
+            uppRow = uppI + 1;
+            break;
+          }
+        }
+      }
+      var uppValues = {
+        Player: body.player,
+        DOB: body.dob || "",
+        HeightFt: body.heightFt || "",
+        HeightIn: body.heightIn || "",
+        Weight: body.weight || "",
+        Throws: body.throws || "",
+        Bats: body.bats || "",
+        Parent1Name: body.parent1Name || "",
+        Parent1Email: body.parent1Email || "",
+        Parent1Phone: body.parent1Phone || "",
+        Parent2Name: body.parent2Name || "",
+        Parent2Email: body.parent2Email || "",
+        Parent2Phone: body.parent2Phone || "",
+        Address: body.address || "",
+        City: body.city || "",
+        State: body.state || "",
+        Zip: body.zip || "",
+      };
+      if (uppRow === -1) {
+        uppValues.Id = newId_();
+        uppValues.CreatedAt = new Date().toISOString();
+        appendRowByHeaders_(uppSheet, uppValues);
+      } else {
+        setRowByHeaders_(uppSheet, uppRow, uppValues);
+      }
+      result = { ok: true };
+    }
   } else if (body.action === "uploadDrillVideo") {
     // Legacy small-file path (kept for compatibility)
     var folders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
