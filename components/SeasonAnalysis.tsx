@@ -1091,10 +1091,13 @@ function GameDetail({ game, batting, pitching, onBack, onDelete }: {
       {highlights.length > 0 && (
         <div>
           <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">Highlights</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             {highlights.map((link, i) => (
               <a key={i} href={link} target="_blank" rel="noopener noreferrer"
-                className="text-sm text-accent hover:underline break-all">{link}</a>
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/20 border border-accent/40 text-accent text-sm font-bold hover:bg-accent/30 transition-colors w-fit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                {highlights.length > 1 ? `Highlights ${i + 1}` : "Watch Highlights"}
+              </a>
             ))}
           </div>
         </div>
