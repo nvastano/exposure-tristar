@@ -555,6 +555,12 @@ function doGet(e) {
   } else if (action === "gameAtBats") {
     var ga = getSheet_("GameAtBats", ["Id","GameId","Team","Player","Jersey","Inning","Result","Balls","Strikes","FieldedTo"]);
     result = rowsToObjects_(ga.getDataRange().getValues());
+  } else if (action === "oppBatting") {
+    var ob = getSheet_("OppBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO"]);
+    result = rowsToObjects_(ob.getDataRange().getValues());
+  } else if (action === "oppPitching") {
+    var op = getSheet_("OppPitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR"]);
+    result = rowsToObjects_(op.getDataRange().getValues());
   } else if (action === "practiceSessions") {
     var psSheet = getSheet_(PRACTICE_SESSIONS_SHEET, ["Id", "Date", "Label", "CreatedAt"]);
     backfillIds_(psSheet);
@@ -1579,6 +1585,8 @@ function doPost(e) {
         // Delete existing batting/pitching rows for this game, then re-add
         var gbSheet = getSheet_("GameBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO","doubles","triples","HR","SB","HBP","SAC"]);
         var gpSheet = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
+        var obSheet = getSheet_("OppBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO"]);
+        var opSheet = getSheet_("OppPitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR"]);
         // Delete batting rows
         var gbData = gbSheet.getDataRange().getValues();
         var gbIdCol = gbData[0].indexOf("GameId");
@@ -1590,6 +1598,18 @@ function doPost(e) {
         var gpIdCol = gpData[0].indexOf("GameId");
         for (var i = gpData.length - 1; i >= 1; i--) {
           if (gpData[i][gpIdCol] === existingGameId) gpSheet.deleteRow(i + 1);
+        }
+        // Delete opp batting rows
+        var obData = obSheet.getDataRange().getValues();
+        var obIdCol = obData[0].indexOf("GameId");
+        for (var i = obData.length - 1; i >= 1; i--) {
+          if (obData[i][obIdCol] === existingGameId) obSheet.deleteRow(i + 1);
+        }
+        // Delete opp pitching rows
+        var opData = opSheet.getDataRange().getValues();
+        var opIdCol = opData[0].indexOf("GameId");
+        for (var i = opData.length - 1; i >= 1; i--) {
+          if (opData[i][opIdCol] === existingGameId) opSheet.deleteRow(i + 1);
         }
         // Update the game row
         var gameRowIdx = -1;
@@ -1621,6 +1641,16 @@ function doPost(e) {
     var gpSheet2 = getSheet_("GamePitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR","BF","PC","Strikes","W","L","SV"]);
     (body.pitching || []).forEach(function(p) {
       appendRowByHeaders_(gpSheet2, { Id: newId_(), GameId: existingGameId, Player: p.player, IP: p.ip, H: p.h, R: p.r, ER: p.er, BB: p.bb, SO: p.so, HR: p.hr || 0, BF: p.bf || 0, PC: p.pc || 0, Strikes: p.strikes || 0, W: p.w || 0, L: p.l || 0, SV: p.sv || 0 });
+    });
+    // Insert opponent batting rows
+    var obSheet2 = getSheet_("OppBatting", ["Id","GameId","Player","AB","R","H","RBI","BB","SO"]);
+    (body.oppBatting || []).forEach(function(b) {
+      appendRowByHeaders_(obSheet2, { Id: newId_(), GameId: existingGameId, Player: b.player, AB: b.ab, R: b.r, H: b.h, RBI: b.rbi, BB: b.bb, SO: b.so });
+    });
+    // Insert opponent pitching rows
+    var opSheet2 = getSheet_("OppPitching", ["Id","GameId","Player","IP","H","R","ER","BB","SO","HR"]);
+    (body.oppPitching || []).forEach(function(p) {
+      appendRowByHeaders_(opSheet2, { Id: newId_(), GameId: existingGameId, Player: p.player, IP: p.ip, H: p.h, R: p.r, ER: p.er, BB: p.bb, SO: p.so, HR: p.hr || 0 });
     });
     result = result || { ok: true, gameId: existingGameId };
   } else if (body.action === "saveGameAtBats") {

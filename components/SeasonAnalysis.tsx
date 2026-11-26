@@ -27,11 +27,20 @@ type PitchingRow = {
   IP: string; H: string; R: string; ER: string; BB: string; SO: string;
   HR: string; BF: string; PC: string; Strikes: string; W: string; L: string; SV: string;
 };
+type OppBattingRow = {
+  Id: string; GameId: string; Player: string;
+  AB: string; R: string; H: string; RBI: string; BB: string; SO: string;
+};
+type OppPitchingRow = {
+  Id: string; GameId: string; Player: string;
+  IP: string; H: string; R: string; ER: string; BB: string; SO: string; HR: string;
+};
 
 type ParsedGame = {
   date: string; opponent: string; homeAway: string;
   teamScore: number; oppScore: number; notes: string;
   batting: ParsedBatter[]; pitching: ParsedPitcher[];
+  oppBatting: ParsedBatter[]; oppPitching: ParsedPitcher[];
   highlights?: string[]; recap?: string;
   gameId?: string; season?: string;
 };
@@ -41,7 +50,8 @@ type ParsedPitcher = { player: string; ip: number; h: number; r: number; er: num
 // ── PDF parser ───────────────────────────────────────────────────────────────
 
 function parsePdfText(raw: string): ParsedGame | null {
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  const rawLines = raw.split("\n");
+  const lines = rawLines.map(l => l.trim()).filter(Boolean);
 
   // Header line: "Smoke 12U 4 - 6 Team Elite 12U" or similar
   // Also look for inning lines: SMK1 / TMLT
@@ -75,51 +85,72 @@ function parsePdfText(raw: string): ParsedGame | null {
     if (m2) { date = new Date(m2[1]).toISOString().slice(0, 10); break; }
   }
 
-  // Find batting section
-  // Pattern after "BATTING" line: each batter line has name + 6+ numbers
+  // Find batting/pitching sections — box score is two-column layout.
+  // Detect the split column from the header row (gap between team columns).
   const batting: ParsedBatter[] = [];
   const pitching: ParsedPitcher[] = [];
+  const oppBatting: ParsedBatter[] = [];
+  const oppPitching: ParsedPitcher[] = [];
 
   let section = ""; // "batting" | "pitching"
-  let teamSection = ""; // "away" | "home" | ""
-  let inTeamElite = false;
+  let splitCol = 56; // default column where opponent side starts
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  // Helper: parse a batter from raw text "Player #N (POS)  AB R H RBI BB SO"
+  function parseBatterStr(s: string): ParsedBatter | null {
+    const t = s.trim();
+    const m = t.match(/^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
+    if (!m) return null;
+    const player = cleanPlayerName(m[1].replace(/#\d+/, "").replace(/\(.*?\)/, "").trim());
+    if (!player || /^totals$/i.test(player)) return null;
+    return { player, ab: +m[2], r: +m[3], h: +m[4], rbi: +m[5], bb: +m[6], so: +m[7], doubles: 0, triples: 0, hr: 0, sb: 0, hbp: 0, sac: 0 };
+  }
+
+  function parsePitcherStr(s: string): ParsedPitcher | null {
+    const t = s.trim();
+    const m = t.match(/^(.+?)\s+([\d.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
+    if (!m) return null;
+    const player = cleanPlayerName(m[1].replace(/#\d+/, "").replace(/\(.*?\)/, "").trim());
+    if (!player || /^totals$/i.test(player)) return null;
+    return { player, ip: parseFloat(m[2]), h: +m[3], r: +m[4], er: +m[5], bb: +m[6], so: +m[7], hr: +m[8], bf: 0, pc: 0, strikes: 0, w: 0, l: 0, sv: 0 };
+  }
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const rawLine = rawLines[i];
+    const line = rawLine.trim();
     if (/^BATTING$/i.test(line)) { section = "batting"; continue; }
     if (/^PITCHING$/i.test(line)) { section = "pitching"; continue; }
     if (!section) continue;
 
-    // Detect Team Elite column header
-    if (/team elite/i.test(line)) { inTeamElite = true; continue; }
+    // Detect split column from team header row (has both team names separated by large gap)
+    if (/team elite/i.test(line) && /AB\s+R\s+H/i.test(line)) {
+      // Find position of second "AB" after the gap
+      const secondAb = rawLine.indexOf("AB", rawLine.indexOf("AB") + 5);
+      if (secondAb > 0) splitCol = secondAb - 20; // back up to start of opp name
+      continue;
+    }
+    // Skip pitching header rows
+    if (/team elite/i.test(line) && /IP\s+H\s+R/i.test(line)) {
+      const secondIp = rawLine.indexOf("IP", rawLine.indexOf("IP") + 5);
+      if (secondIp > 0) splitCol = secondIp - 20;
+      continue;
+    }
 
     if (section === "batting") {
-      // Row pattern: "Player Name #N (POS)   AB   R   H   RBI  BB  SO"
-      // Numbers are the last 6 tokens; first part is name
-      const m = line.match(/^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
-      if (m) {
-        const nums = [m[2],m[3],m[4],m[5],m[6],m[7]].map(Number);
-        const playerRaw = m[1].replace(/#\d+/, "").replace(/\(.*?\)/, "").trim();
-        const player = cleanPlayerName(playerRaw);
-        // Check if this belongs to Team Elite (we process both sides, but only keep TE)
-        if (isTeamElitePlayer(player, line) || inTeamElite) {
-          batting.push({ player, ab: nums[0], r: nums[1], h: nums[2], rbi: nums[3], bb: nums[4], so: nums[5], doubles: 0, triples: 0, hr: 0, sb: 0, hbp: 0, sac: 0 });
-        }
-      }
-      // "Totals" resets team section
-      if (/^Totals/i.test(line)) inTeamElite = false;
+      const leftStr = rawLine.length > splitCol ? rawLine.substring(0, splitCol) : rawLine;
+      const rightStr = rawLine.length > splitCol ? rawLine.substring(splitCol) : "";
+      const lb = parseBatterStr(leftStr);
+      if (lb) batting.push(lb);
+      const rb = parseBatterStr(rightStr);
+      if (rb) oppBatting.push(rb);
     }
 
     if (section === "pitching") {
-      // Row pattern: "Player   IP  H  R  ER  BB  SO  HR"
-      const m = line.match(/^(.+?)\s+([\d.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
-      if (m) {
-        const player = cleanPlayerName(m[1].replace(/#\d+/, "").replace(/\(.*?\)/, "").trim());
-        if (isTeamElitePlayer(player, line) || inTeamElite) {
-          pitching.push({ player, ip: parseFloat(m[2]), h: +m[3], r: +m[4], er: +m[5], bb: +m[6], so: +m[7], hr: +m[8], bf: 0, pc: 0, strikes: 0, w: 0, l: 0, sv: 0 });
-        }
-      }
-      if (/^Totals/i.test(line)) inTeamElite = false;
+      const leftStr = rawLine.length > splitCol ? rawLine.substring(0, splitCol) : rawLine;
+      const rightStr = rawLine.length > splitCol ? rawLine.substring(splitCol) : "";
+      const lp = parsePitcherStr(leftStr);
+      if (lp) pitching.push(lp);
+      const rp = parsePitcherStr(rightStr);
+      if (rp) oppPitching.push(rp);
     }
   }
 
@@ -147,7 +178,7 @@ function parsePdfText(raw: string): ParsedGame | null {
   if (!date) date = new Date().toISOString().slice(0, 10);
   if (!opponent) opponent = "Unknown";
 
-  return { date, opponent, homeAway, teamScore, oppScore, notes: "", batting, pitching };
+  return { date, opponent, homeAway, teamScore, oppScore, notes: "", batting, pitching, oppBatting, oppPitching };
 }
 
 function cleanPlayerName(raw: string): string {
@@ -399,6 +430,8 @@ export default function SeasonAnalysis() {
   const [batting, setBatting] = useState<BattingRow[]>([]);
   const [pitching, setPitching] = useState<PitchingRow[]>([]);
   const [dbAtBats, setDbAtBats] = useState<AtBatRecord[]>([]);
+  const [oppBatting, setOppBatting] = useState<OppBattingRow[]>([]);
+  const [oppPitching, setOppPitching] = useState<OppPitchingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"log" | "batting" | "pitching" | "trends" | "game">("log");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -424,16 +457,20 @@ export default function SeasonAnalysis() {
   async function loadData() {
     setLoading(true);
     try {
-      const [g, b, p, ga] = await Promise.all([
+      const [g, b, p, ga, ob, op] = await Promise.all([
         sheetsGet("games") as Promise<Game[]>,
         sheetsGet("gameBatting") as Promise<BattingRow[]>,
         sheetsGet("gamePitching") as Promise<PitchingRow[]>,
         sheetsGet("gameAtBats") as Promise<AtBatRecord[]>,
+        sheetsGet("oppBatting") as Promise<OppBattingRow[]>,
+        sheetsGet("oppPitching") as Promise<OppPitchingRow[]>,
       ]);
       setGames(g.sort((a, b) => a.Date > b.Date ? 1 : -1));
       setBatting(b);
       setPitching(p);
       setDbAtBats(ga);
+      setOppBatting(ob || []);
+      setOppPitching(op || []);
     } finally {
       setLoading(false);
     }
@@ -494,7 +531,8 @@ export default function SeasonAnalysis() {
     setSaving(true); setSaveMsg("");
     try {
       const validHighlights = highlights.filter(h => h.trim());
-      const payload = { ...parsed, highlights: validHighlights, recap, season: parsed.season || ACTIVE_SEASON };
+      const payload = { ...parsed, highlights: validHighlights, recap, season: parsed.season || ACTIVE_SEASON,
+        oppBatting: parsed.oppBatting || [], oppPitching: parsed.oppPitching || [] };
       const res = await sheetsPost("saveGame", payload) as any;
       const gameId = res.gameId;
       if (parsedAtBats.length > 0 && gameId) {
@@ -762,6 +800,8 @@ export default function SeasonAnalysis() {
               batting={batting.filter(r => r.GameId === selectedGame.Id)}
               pitching={pitching.filter(r => r.GameId === selectedGame.Id)}
               atBats={dbAtBats.filter(r => r.GameId === selectedGame.Id)}
+              oppBatting={oppBatting.filter(r => r.GameId === selectedGame.Id)}
+              oppPitching={oppPitching.filter(r => r.GameId === selectedGame.Id)}
               onBack={() => { setSelectedGame(null); setView("log"); }}
               onDelete={() => deleteGame(selectedGame.Id)}
             />
@@ -1044,9 +1084,9 @@ function TrendsView({ games, batting, pitching }: { games: Game[]; batting: Batt
 
 // ── Game detail view ──────────────────────────────────────────────────────────
 
-function GameDetail({ game, batting, pitching, atBats, onBack, onDelete }: {
+function GameDetail({ game, batting, pitching, atBats, oppBatting, oppPitching, onBack, onDelete }: {
   game: Game; batting: BattingRow[]; pitching: PitchingRow[];
-  atBats: AtBatRecord[];
+  atBats: AtBatRecord[]; oppBatting: OppBattingRow[]; oppPitching: OppPitchingRow[];
   onBack: () => void; onDelete: () => void;
 }) {
   const w = n(game.TeamScore) > n(game.OppScore);
@@ -1147,6 +1187,66 @@ function GameDetail({ game, batting, pitching, atBats, onBack, onDelete }: {
                     <td className="px-3 py-2 text-white/70">{p.BB}</td>
                     <td className="px-3 py-2 text-white/70">{p.SO}</td>
                     <td className="px-3 py-2 text-white/70">{p.PC || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Opponent batting */}
+      {oppBatting.length > 0 && (
+        <div>
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">{game.Opponent} Batting</p>
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="text-xs w-full">
+              <thead><tr className="bg-white/5 text-white/40">
+                {["Player","AB","R","H","AVG","RBI","BB","SO"].map(h => (
+                  <th key={h} className={`px-3 py-2 font-semibold ${h === "Player" ? "text-left" : "text-right"}`}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {oppBatting.map((r, i) => (
+                  <tr key={r.Id} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                    <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.Player}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.AB}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.R}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.H}</td>
+                    <td className="px-3 py-2 text-right text-accent font-semibold">{avg(n(r.H), n(r.AB))}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.RBI}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.BB}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.SO}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Opponent pitching */}
+      {oppPitching.length > 0 && (
+        <div>
+          <p className="text-xs font-bold tracking-widest text-white/40 uppercase mb-2">{game.Opponent} Pitching</p>
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="text-xs w-full">
+              <thead><tr className="bg-white/5 text-white/40">
+                {["Player","IP","H","R","ER","BB","SO","ERA"].map(h => (
+                  <th key={h} className={`px-3 py-2 font-semibold ${h === "Player" ? "text-left" : "text-right"}`}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {oppPitching.map((r, i) => (
+                  <tr key={r.Id} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                    <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.Player}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.IP}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.H}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.R}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.ER}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.BB}</td>
+                    <td className="px-3 py-2 text-right text-white/70">{r.SO}</td>
+                    <td className="px-3 py-2 text-right text-accent font-semibold">{era(n(r.ER), n(r.IP))}</td>
                   </tr>
                 ))}
               </tbody>
