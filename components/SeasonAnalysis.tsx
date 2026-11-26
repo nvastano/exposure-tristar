@@ -715,7 +715,7 @@ export default function SeasonAnalysis() {
                       {w ? "W" : l ? "L" : "T"}
                     </span>
                     <span className="font-semibold text-sm flex-1">
-                      {g.HomeAway === "H" ? "vs" : "@"} {g.Opponent}
+                      {(g.HomeAway === "H" || g.HomeAway === "Home") ? "vs" : "@"} {g.Opponent}
                     </span>
                     <span className="text-sm font-bold text-white">{g.TeamScore}–{g.OppScore}</span>
                     <span className="text-xs text-white/40 w-16 text-right">{formatDate(g.Date)}</span>
@@ -987,7 +987,7 @@ function GameDetail({ game, batting, pitching, onBack, onDelete }: {
         <button onClick={onBack} className="text-xs text-white/40 hover:text-white transition-colors">← Back</button>
         <div className="flex-1">
           <p className="font-bold text-white text-lg">
-            {game.HomeAway === "H" ? "vs" : "@"} {game.Opponent}
+            {(game.HomeAway === "H" || game.HomeAway === "Home") ? "vs" : "@"} {game.Opponent}
             <span className="ml-3 text-accent">{game.TeamScore}–{game.OppScore}</span>
             <span className={`ml-2 text-sm font-semibold ${w ? "text-green-400" : l ? "text-red-400" : "text-white/40"}`}>{w ? "W" : l ? "L" : "T"}</span>
           </p>
