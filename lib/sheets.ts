@@ -1,3 +1,5 @@
+import { getCoachToken } from "@/lib/coachAuth";
+
 const WEBAPP_URL = process.env.NEXT_PUBLIC_SHEETS_WEBAPP_URL;
 
 function requireUrl(): string {
@@ -26,4 +28,23 @@ export async function sheetsPost(action: string, payload: unknown) {
   });
   if (!res.ok) throw new Error(`Sheets POST ${action} failed: ${res.status}`);
   return res.json();
+}
+
+// Variants for actions the Apps Script backend requires a coach token for
+// (player/parent profiles, birth certificates). The token is verified
+// server-side in Code.gs, not just checked client-side.
+function requireCoachToken(): string {
+  const token = getCoachToken();
+  if (!token) {
+    throw new Error("Coach login required (or session expired) for this action.");
+  }
+  return token;
+}
+
+export async function sheetsGetAuthed(action: string, params: Record<string, string> = {}) {
+  return sheetsGet(action, { ...params, token: requireCoachToken() });
+}
+
+export async function sheetsPostAuthed(action: string, payload: unknown) {
+  return sheetsPost(action, { ...(payload as object), token: requireCoachToken() });
 }
