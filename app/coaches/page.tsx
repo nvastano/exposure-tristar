@@ -10,6 +10,7 @@ import { sheetsGet, sheetsGetAuthed, sheetsPost } from "@/lib/sheets";
 import AssignedWorkCoach from "@/components/AssignedWorkCoach";
 import PracticeAttendance from "@/components/PracticeAttendance";
 import SeasonAnalysis from "@/components/SeasonAnalysis";
+import BirthCertificateUpload from "@/components/BirthCertificateUpload";
 
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
@@ -179,17 +180,6 @@ function RosterProfiles() {
       </button>
     );
 
-    if (!profile) {
-      return (
-        <div className="rounded-lg border border-white/10 bg-white/3 p-4 flex items-center justify-between gap-3">
-          <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-white/30 italic">Not submitted</span>
-            <StatusToggle />
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="rounded-lg border border-white/10 bg-white/3 overflow-hidden">
         <button
@@ -198,55 +188,68 @@ function RosterProfiles() {
         >
           <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
           <div className="flex items-center gap-3 text-xs text-white/40">
+            {profile ? (
+              <>
+                <span>{profile.Parent1Name || "—"}</span>
+                <span>{profile.Parent1Phone || "—"}</span>
+              </>
+            ) : (
+              <span className="text-white/30 italic">Not submitted</span>
+            )}
             <StatusToggle />
-            <span>{profile.Parent1Name || "—"}</span>
-            <span>{profile.Parent1Phone || "—"}</span>
             <span className={`transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}>▾</span>
           </div>
         </button>
         {isOpen && (
           <div className="border-t border-white/10 p-4 flex flex-col gap-4">
-            {/* Athlete */}
-            <div>
-              <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
+            {profile ? (
+              <>
+                {/* Athlete */}
+                <div>
+                  <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
+                    {[
+                      ["DOB", profile.DOB ? (() => { try { const d = new Date(profile.DOB); return `${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; } catch { return profile.DOB; } })() : "—"],
+                      ["Height", height(profile)],
+                      ["Weight", profile.Weight ? `${profile.Weight} lbs` : "—"],
+                      ["Throws", profile.Throws || "—"],
+                      ["Bats", profile.Bats || "—"],
+                    ].map(([l, v]) => (
+                      <div key={l} className="flex flex-col">
+                        <span className="text-white/30 text-xs">{l}</span>
+                        <span className="font-medium">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Parents */}
                 {[
-                  ["DOB", profile.DOB ? (() => { try { const d = new Date(profile.DOB); return `${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; } catch { return profile.DOB; } })() : "—"],
-                  ["Height", height(profile)],
-                  ["Weight", profile.Weight ? `${profile.Weight} lbs` : "—"],
-                  ["Throws", profile.Throws || "—"],
-                  ["Bats", profile.Bats || "—"],
-                ].map(([l, v]) => (
-                  <div key={l} className="flex flex-col">
-                    <span className="text-white/30 text-xs">{l}</span>
-                    <span className="font-medium">{v}</span>
+                  { name: profile.Parent1Name, email: profile.Parent1Email, phone: profile.Parent1Phone, label: "Parent / Guardian 1" },
+                  { name: profile.Parent2Name, email: profile.Parent2Email, phone: profile.Parent2Phone, label: "Parent / Guardian 2" },
+                ].filter((p) => p.name).map((p) => (
+                  <div key={p.label}>
+                    <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">{p.label}</p>
+                    <div className="flex flex-col gap-0.5 text-sm">
+                      <span className="font-semibold">{p.name}</span>
+                      {p.email && <a href={`mailto:${p.email}`} className="text-accent hover:underline text-xs">{p.email}</a>}
+                      {p.phone && <a href={`tel:${p.phone}`} className="text-white/60 hover:text-white text-xs">{p.phone}</a>}
+                    </div>
                   </div>
                 ))}
-              </div>
-            </div>
-            {/* Parents */}
-            {[
-              { name: profile.Parent1Name, email: profile.Parent1Email, phone: profile.Parent1Phone, label: "Parent / Guardian 1" },
-              { name: profile.Parent2Name, email: profile.Parent2Email, phone: profile.Parent2Phone, label: "Parent / Guardian 2" },
-            ].filter((p) => p.name).map((p) => (
-              <div key={p.label}>
-                <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">{p.label}</p>
-                <div className="flex flex-col gap-0.5 text-sm">
-                  <span className="font-semibold">{p.name}</span>
-                  {p.email && <a href={`mailto:${p.email}`} className="text-accent hover:underline text-xs">{p.email}</a>}
-                  {p.phone && <a href={`tel:${p.phone}`} className="text-white/60 hover:text-white text-xs">{p.phone}</a>}
-                </div>
-              </div>
-            ))}
-            {/* Address */}
-            {(profile.Address || profile.City) && (
-              <div>
-                <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Address</p>
-                <p className="text-sm text-white/70">
-                  {[profile.Address, profile.City, profile.State, profile.Zip].filter(Boolean).join(", ")}
-                </p>
-              </div>
+                {/* Address */}
+                {(profile.Address || profile.City) && (
+                  <div>
+                    <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Address</p>
+                    <p className="text-sm text-white/70">
+                      {[profile.Address, profile.City, profile.State, profile.Zip].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-white/40">No family profile submitted yet.</p>
             )}
+            <BirthCertificateUpload playerName={p.Name} />
           </div>
         )}
       </div>

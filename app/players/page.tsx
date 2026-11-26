@@ -15,7 +15,6 @@ import LogoLoader from "@/components/LogoLoader";
 import PlayerPhoto from "@/components/PlayerPhoto";
 import AssignedWorkPlayer from "@/components/AssignedWorkPlayer";
 import PlayerPinGate from "@/components/PlayerPinGate";
-import BirthCertificateUpload from "@/components/BirthCertificateUpload";
 
 type PlayerRow = { Id: string; Name: string; Number?: string; Pin?: string };
 type PlayerProfile = {
@@ -386,7 +385,6 @@ function PlayerContent() {
               <Link href="/intake" className="text-accent hover:underline">Share the intake form</Link> with this family.
             </div>
           )}
-          <BirthCertificateUpload playerName={playerName} />
         </div>
       )}
 
