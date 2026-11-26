@@ -694,19 +694,17 @@ export default function SeasonAnalysis() {
       {games.length > 0 && (
         <>
           {/* Season picker */}
-          {seasons.length > 1 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 font-semibold tracking-widest uppercase">Season</span>
-              <div className="flex gap-1 flex-wrap">
-                {seasons.map(s => (
-                  <button key={s} onClick={() => { setSelectedSeason(s); setSelectedGame(null); setView("log"); }}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedSeason === s ? "bg-accent text-white" : "bg-white/5 text-white/50 hover:text-white hover:bg-white/10"}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/40 font-semibold tracking-widest uppercase">Season</span>
+            <div className="flex gap-1 flex-wrap">
+              {seasons.map(s => (
+                <button key={s} onClick={() => { setSelectedSeason(s); setSelectedGame(null); setView("log"); }}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedSeason === s ? "bg-accent text-white" : "bg-white/5 text-white/50 hover:text-white hover:bg-white/10"}`}>
+                  {s}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           <div className="grid grid-cols-4 gap-3">
             {[
