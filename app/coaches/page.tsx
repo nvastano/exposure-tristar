@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
-import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { sheetsGet, sheetsGetAuthed, sheetsPost } from "@/lib/sheets";
 import AssignedWorkCoach from "@/components/AssignedWorkCoach";
 import PracticeAttendance from "@/components/PracticeAttendance";
 import SeasonAnalysis from "@/components/SeasonAnalysis";
@@ -110,10 +110,12 @@ function RosterProfiles() {
   async function loadPlayers() {
     const [p, pr] = await Promise.all([
       (sheetsGet("players", { includeInactive: "1" }) as Promise<PlayerRow[]>),
-      (sheetsGet("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
+      // This component only renders once a coach has unlocked (see
+      // CoachesInner below), so a valid token is available here.
+      (sheetsGetAuthed("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
     ]);
     setPlayers(p);
-    setProfiles(pr);
+    setProfiles(Array.isArray(pr) ? pr : []);
     setLoading(false);
   }
 
