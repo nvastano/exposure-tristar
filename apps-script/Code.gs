@@ -459,6 +459,12 @@ function doGet(e) {
       .filter(function (x) {
         return x !== null;
       });
+  } else if (action === "submittedProfileNames") {
+    // Public, minimal view for the intake form's "already submitted" check:
+    // player names only, never DOB or parent info.
+    result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player"]).getDataRange().getValues()).map(function (row) {
+      return { Player: row.Player };
+    });
   } else if (action === "listBirthCertificates") {
     if (!requireCoach_(e.parameter.token)) {
       result = { error: "unauthorized" };
