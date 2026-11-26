@@ -804,7 +804,7 @@ export default function SeasonAnalysis() {
 
           {/* Trends view */}
           {view === "trends" && !selectedGame && (
-            <TrendsView atBats={dbAtBats} />
+            <TrendsView atBats={dbAtBats} games={games} />
           )}
         </>
       )}
@@ -820,9 +820,10 @@ export default function SeasonAnalysis() {
 
 // ── Trends view ───────────────────────────────────────────────────────────────
 
-function TrendsView({ atBats }: { atBats: AtBatRecord[] }) {
+function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] }) {
   const [team, setTeam] = useState<"our" | "opp">("our");
   const [playerFilter, setPlayerFilter] = useState("");
+  const [oppFilter, setOppFilter] = useState("all");
 
   if (atBats.length === 0) {
     return (
@@ -832,7 +833,19 @@ function TrendsView({ atBats }: { atBats: AtBatRecord[] }) {
     );
   }
 
-  const teamAbs = atBats.filter(ab => ab.Team === (team === "our" ? "our" : "opp"));
+  // Build opponent list from games for the filter dropdown
+  const opponents = Array.from(new Set(games.map(g => g.Opponent))).sort();
+
+  // For opponent view, optionally restrict to a specific opponent's games
+  const allowedGameIds = team === "opp" && oppFilter !== "all"
+    ? new Set(games.filter(g => g.Opponent === oppFilter).map(g => g.Id))
+    : null;
+
+  const teamAbs = atBats.filter(ab => {
+    if (ab.Team !== (team === "our" ? "our" : "opp")) return false;
+    if (allowedGameIds && !allowedGameIds.has(ab.GameId)) return false;
+    return true;
+  });
   const players = Array.from(new Set(teamAbs.map(ab => ab.Player))).sort();
   const filtered = playerFilter
     ? teamAbs.filter(ab => ab.Player.toLowerCase().includes(playerFilter.toLowerCase()))
@@ -879,6 +892,13 @@ function TrendsView({ atBats }: { atBats: AtBatRecord[] }) {
             </button>
           ))}
         </div>
+        {team === "opp" && opponents.length > 1 && (
+          <select value={oppFilter} onChange={e => { setOppFilter(e.target.value); setPlayerFilter(""); }}
+            className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/60">
+            <option value="all">All opponents</option>
+            {opponents.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
         <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
           className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-40" />
         <span className="text-xs text-white/30">{filtered.length} at-bats</span>

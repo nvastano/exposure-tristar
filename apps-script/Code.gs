@@ -1385,9 +1385,32 @@ function doPost(e) {
     for (var i = gaData.length - 1; i >= 1; i--) {
       if (gaData[i][gaIdCol] === body.gameId) gaSheet.deleteRow(i + 1);
     }
-    (body.atBats || []).forEach(function(ab) {
-      appendRowByHeaders_(gaSheet, { Id: newId_(), GameId: body.gameId, Team: ab.team, Player: ab.player, Jersey: ab.jersey, Inning: ab.inning, Result: ab.result, Balls: ab.balls, Strikes: ab.strikes, FieldedTo: ab.fieldedTo || 0 });
-    });
+    // Batch-write all at-bats in one setValues call to avoid timeout
+    var absToWrite = body.atBats || [];
+    if (absToWrite.length > 0) {
+      var headers = ["Id","GameId","Team","Player","Jersey","Inning","Result","Balls","Strikes","FieldedTo"];
+      headers.forEach(function(h) { ensureColumn_(gaSheet, h); });
+      var colMap = {};
+      var hRow = gaSheet.getRange(1, 1, 1, gaSheet.getLastColumn()).getValues()[0];
+      hRow.forEach(function(h, i) { colMap[h] = i; });
+      var numCols = gaSheet.getLastColumn();
+      var startRow = gaSheet.getLastRow() + 1;
+      var rows = absToWrite.map(function(ab) {
+        var row = new Array(numCols).fill("");
+        row[colMap["Id"]] = newId_();
+        row[colMap["GameId"]] = body.gameId;
+        row[colMap["Team"]] = ab.team;
+        row[colMap["Player"]] = ab.player;
+        row[colMap["Jersey"]] = ab.jersey;
+        row[colMap["Inning"]] = ab.inning;
+        row[colMap["Result"]] = ab.result;
+        row[colMap["Balls"]] = ab.balls;
+        row[colMap["Strikes"]] = ab.strikes;
+        row[colMap["FieldedTo"]] = ab.fieldedTo || 0;
+        return row;
+      });
+      gaSheet.getRange(startRow, 1, rows.length, numCols).setValues(rows);
+    }
     result = { ok: true };
   } else if (body.action === "deleteGame") {
     var gSheet = getSheet_("Games", ["Id","Date","Opponent","HomeAway","TeamScore","OppScore","Notes","Highlights","Recap"]);
