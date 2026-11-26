@@ -404,6 +404,8 @@ export default function SeasonAnalysis() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
   const [selectedSeason, setSelectedSeason] = useState(ACTIVE_SEASON);
+  const [battingSort, setBattingSort] = useState<{ col: string; asc: boolean }>({ col: "AVG", asc: false });
+  const [pitchingSort, setPitchingSort] = useState<{ col: string; asc: boolean }>({ col: "IP", asc: false });
 
   // PDF upload state
   const [dragging, setDragging] = useState(false);
@@ -765,70 +767,132 @@ export default function SeasonAnalysis() {
           )}
 
           {/* Season batting */}
-          {view === "batting" && !selectedGame && (
-            <div className="flex flex-col gap-3">
-              <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
-                className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-48" />
+          {view === "batting" && !selectedGame && (() => {
+            const bCols: { key: string; label: string; val: (r: typeof seasonBatting[0]) => number }[] = [
+              { key: "Player", label: "Player", val: () => 0 },
+              { key: "G",      label: "G",      val: r => r.games },
+              { key: "AB",     label: "AB",     val: r => r.ab },
+              { key: "R",      label: "R",      val: r => r.r },
+              { key: "H",      label: "H",      val: r => r.h },
+              { key: "AVG",    label: "AVG",    val: r => r.ab ? r.h / r.ab : 0 },
+              { key: "2B",     label: "2B",     val: r => r.doubles },
+              { key: "HR",     label: "HR",     val: r => r.hr },
+              { key: "RBI",    label: "RBI",    val: r => r.rbi },
+              { key: "BB",     label: "BB",     val: r => r.bb },
+              { key: "SO",     label: "SO",     val: r => r.so },
+              { key: "SB",     label: "SB",     val: r => r.sb },
+            ];
+            const toggleBSort = (col: string) => setBattingSort(s => ({ col, asc: s.col === col ? !s.asc : false }));
+            const colDef = bCols.find(c => c.key === battingSort.col);
+            const sorted = [...seasonBatting]
+              .filter(r => !playerFilter || r.player.toLowerCase().includes(playerFilter.toLowerCase()))
+              .sort((a, b) => {
+                if (battingSort.col === "Player") return battingSort.asc ? a.player.localeCompare(b.player) : b.player.localeCompare(a.player);
+                const av = colDef ? colDef.val(a) : 0;
+                const bv = colDef ? colDef.val(b) : 0;
+                return battingSort.asc ? av - bv : bv - av;
+              });
+            return (
+              <div className="flex flex-col gap-3">
+                <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
+                  className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-48" />
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="text-sm w-full">
+                    <thead><tr className="bg-white/5 text-white/40 text-xs">
+                      {bCols.map(c => (
+                        <th key={c.key} className="text-left px-3 py-2 font-semibold whitespace-nowrap">
+                          <button onClick={() => toggleBSort(c.key)}
+                            className={`flex items-center gap-1 hover:text-white transition-colors ${battingSort.col === c.key ? "text-white" : ""}`}>
+                            {c.label}
+                            {battingSort.col === c.key ? (battingSort.asc ? " ↑" : " ↓") : ""}
+                          </button>
+                        </th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {sorted.map((r, i) => (
+                        <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                          <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
+                          <td className="px-3 py-2 text-white/70">{r.games}</td>
+                          <td className="px-3 py-2 text-white/70">{r.ab}</td>
+                          <td className="px-3 py-2 text-white/70">{r.r}</td>
+                          <td className="px-3 py-2 text-white/70">{r.h}</td>
+                          <td className="px-3 py-2 font-bold text-accent">{avg(r.h, r.ab)}</td>
+                          <td className="px-3 py-2 text-white/70">{r.doubles}</td>
+                          <td className="px-3 py-2 text-white/70">{r.hr}</td>
+                          <td className="px-3 py-2 text-white/70">{r.rbi}</td>
+                          <td className="px-3 py-2 text-white/70">{r.bb}</td>
+                          <td className="px-3 py-2 text-white/70">{r.so}</td>
+                          <td className="px-3 py-2 text-white/70">{r.sb}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Season pitching */}
+          {view === "pitching" && !selectedGame && (() => {
+            const pCols: { key: string; label: string; val: (r: typeof seasonPitching[0]) => number }[] = [
+              { key: "Player", label: "Player", val: () => 0 },
+              { key: "App",    label: "App",    val: r => r.apps },
+              { key: "W",      label: "W",      val: r => r.wins },
+              { key: "L",      label: "L",      val: r => r.losses },
+              { key: "IP",     label: "IP",     val: r => r.ip },
+              { key: "ERA",    label: "ERA",    val: r => r.ip ? (r.er / r.ip) * 7 : 999 },
+              { key: "H",      label: "H",      val: r => r.h },
+              { key: "R",      label: "R",      val: r => r.r },
+              { key: "ER",     label: "ER",     val: r => r.er },
+              { key: "BB",     label: "BB",     val: r => r.bb },
+              { key: "SO",     label: "SO",     val: r => r.so },
+              { key: "PC",     label: "PC",     val: r => r.pc },
+            ];
+            const togglePSort = (col: string) => setPitchingSort(s => ({ col, asc: s.col === col ? !s.asc : false }));
+            const colDef = pCols.find(c => c.key === pitchingSort.col);
+            const sorted = [...seasonPitching].sort((a, b) => {
+              if (pitchingSort.col === "Player") return pitchingSort.asc ? a.player.localeCompare(b.player) : b.player.localeCompare(a.player);
+              const av = colDef ? colDef.val(a) : 0;
+              const bv = colDef ? colDef.val(b) : 0;
+              return pitchingSort.asc ? av - bv : bv - av;
+            });
+            return (
               <div className="overflow-x-auto rounded-xl border border-white/10">
                 <table className="text-sm w-full">
                   <thead><tr className="bg-white/5 text-white/40 text-xs">
-                    {["Player","G","AB","R","H","AVG","2B","HR","RBI","BB","SO","SB"].map(h => (
-                      <th key={h} className="text-left px-3 py-2 font-semibold whitespace-nowrap">{h}</th>
+                    {pCols.map(c => (
+                      <th key={c.key} className="text-left px-3 py-2 font-semibold whitespace-nowrap">
+                        <button onClick={() => togglePSort(c.key)}
+                          className={`flex items-center gap-1 hover:text-white transition-colors ${pitchingSort.col === c.key ? "text-white" : ""}`}>
+                          {c.label}
+                          {pitchingSort.col === c.key ? (pitchingSort.asc ? " ↑" : " ↓") : ""}
+                        </button>
+                      </th>
                     ))}
                   </tr></thead>
                   <tbody>
-                    {seasonBatting.filter(r => !playerFilter || r.player.toLowerCase().includes(playerFilter.toLowerCase())).map((r, i) => (
+                    {sorted.map((r, i) => (
                       <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
                         <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
-                        <td className="px-3 py-2 text-white/70">{r.games}</td>
-                        <td className="px-3 py-2 text-white/70">{r.ab}</td>
-                        <td className="px-3 py-2 text-white/70">{r.r}</td>
+                        <td className="px-3 py-2 text-white/70">{r.apps}</td>
+                        <td className="px-3 py-2 text-white/70">{r.wins}</td>
+                        <td className="px-3 py-2 text-white/70">{r.losses}</td>
+                        <td className="px-3 py-2 text-white/70">{r.ip.toFixed(1)}</td>
+                        <td className="px-3 py-2 font-bold text-accent">{era(r.er, r.ip)}</td>
                         <td className="px-3 py-2 text-white/70">{r.h}</td>
-                        <td className="px-3 py-2 font-bold text-accent">{avg(r.h, r.ab)}</td>
-                        <td className="px-3 py-2 text-white/70">{r.doubles}</td>
-                        <td className="px-3 py-2 text-white/70">{r.hr}</td>
-                        <td className="px-3 py-2 text-white/70">{r.rbi}</td>
+                        <td className="px-3 py-2 text-white/70">{r.r}</td>
+                        <td className="px-3 py-2 text-white/70">{r.er}</td>
                         <td className="px-3 py-2 text-white/70">{r.bb}</td>
                         <td className="px-3 py-2 text-white/70">{r.so}</td>
-                        <td className="px-3 py-2 text-white/70">{r.sb}</td>
+                        <td className="px-3 py-2 text-white/70">{r.pc || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-
-          {/* Season pitching */}
-          {view === "pitching" && !selectedGame && (
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="text-sm w-full">
-                <thead><tr className="bg-white/5 text-white/40 text-xs">
-                  {["Player","App","W","L","IP","ERA","H","R","ER","BB","SO","PC"].map(h => (
-                    <th key={h} className="text-left px-3 py-2 font-semibold whitespace-nowrap">{h}</th>
-                  ))}
-                </tr></thead>
-                <tbody>
-                  {seasonPitching.map((r, i) => (
-                    <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
-                      <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
-                      <td className="px-3 py-2 text-white/70">{r.apps}</td>
-                      <td className="px-3 py-2 text-white/70">{r.wins}</td>
-                      <td className="px-3 py-2 text-white/70">{r.losses}</td>
-                      <td className="px-3 py-2 text-white/70">{r.ip.toFixed(1)}</td>
-                      <td className="px-3 py-2 font-bold text-accent">{era(r.er, r.ip)}</td>
-                      <td className="px-3 py-2 text-white/70">{r.h}</td>
-                      <td className="px-3 py-2 text-white/70">{r.r}</td>
-                      <td className="px-3 py-2 text-white/70">{r.er}</td>
-                      <td className="px-3 py-2 text-white/70">{r.bb}</td>
-                      <td className="px-3 py-2 text-white/70">{r.so}</td>
-                      <td className="px-3 py-2 text-white/70">{r.pc || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Trends view */}
           {view === "trends" && !selectedGame && (
