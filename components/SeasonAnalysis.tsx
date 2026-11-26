@@ -457,18 +457,21 @@ export default function SeasonAnalysis() {
   async function loadData() {
     setLoading(true);
     try {
-      const [g, b, p, ga, ob, op] = await Promise.all([
+      const [g, b, p, ga] = await Promise.all([
         sheetsGet("games") as Promise<Game[]>,
         sheetsGet("gameBatting") as Promise<BattingRow[]>,
         sheetsGet("gamePitching") as Promise<PitchingRow[]>,
         sheetsGet("gameAtBats") as Promise<AtBatRecord[]>,
-        sheetsGet("oppBatting") as Promise<OppBattingRow[]>,
-        sheetsGet("oppPitching") as Promise<OppPitchingRow[]>,
       ]);
       setGames(g.sort((a, b) => a.Date > b.Date ? 1 : -1));
       setBatting(b);
       setPitching(p);
       setDbAtBats(ga);
+      // Opp sheets may not exist until backend is deployed
+      const [ob, op] = await Promise.all([
+        (sheetsGet("oppBatting") as Promise<OppBattingRow[]>).catch(() => []),
+        (sheetsGet("oppPitching") as Promise<OppPitchingRow[]>).catch(() => []),
+      ]);
       setOppBatting(ob || []);
       setOppPitching(op || []);
     } finally {
