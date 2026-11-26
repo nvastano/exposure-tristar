@@ -761,6 +761,7 @@ export default function SeasonAnalysis() {
               game={selectedGame}
               batting={batting.filter(r => r.GameId === selectedGame.Id)}
               pitching={pitching.filter(r => r.GameId === selectedGame.Id)}
+              atBats={dbAtBats.filter(r => r.GameId === selectedGame.Id)}
               onBack={() => { setSelectedGame(null); setView("log"); }}
               onDelete={() => deleteGame(selectedGame.Id)}
             />
@@ -906,6 +907,8 @@ export default function SeasonAnalysis() {
           No games yet. Drop a GC box score PDF above to add your first game.
         </div>
       )}
+
+
     </div>
   );
 }
@@ -913,9 +916,7 @@ export default function SeasonAnalysis() {
 // ── Trends view ───────────────────────────────────────────────────────────────
 
 function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] }) {
-  const [team, setTeam] = useState<"our" | "opp">("our");
   const [playerFilter, setPlayerFilter] = useState("");
-  const [oppFilter, setOppFilter] = useState("all");
 
   if (atBats.length === 0) {
     return (
@@ -925,19 +926,7 @@ function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] })
     );
   }
 
-  // Build opponent list from games for the filter dropdown
-  const opponents = Array.from(new Set(games.map(g => g.Opponent))).sort();
-
-  // For opponent view, optionally restrict to a specific opponent's games
-  const allowedGameIds = team === "opp" && oppFilter !== "all"
-    ? new Set(games.filter(g => g.Opponent === oppFilter).map(g => g.Id))
-    : null;
-
-  const teamAbs = atBats.filter(ab => {
-    if (ab.Team !== (team === "our" ? "our" : "opp")) return false;
-    if (allowedGameIds && !allowedGameIds.has(ab.GameId)) return false;
-    return true;
-  });
+  const teamAbs = atBats.filter(ab => ab.Team === "our");
   const players = Array.from(new Set(teamAbs.map(ab => ab.Player))).sort();
   const filtered = playerFilter
     ? teamAbs.filter(ab => ab.Player.toLowerCase().includes(playerFilter.toLowerCase()))
@@ -976,21 +965,6 @@ function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] })
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2 items-center flex-wrap">
-        <div className="flex gap-1 bg-white/5 rounded-lg p-1">
-          {(["our","opp"] as const).map(t => (
-            <button key={t} onClick={() => setTeam(t)}
-              className={`text-xs font-bold px-4 py-1.5 rounded-md transition-colors ${team === t ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}>
-              {t === "our" ? "Our Team" : "Opponent"}
-            </button>
-          ))}
-        </div>
-        {team === "opp" && opponents.length > 1 && (
-          <select value={oppFilter} onChange={e => { setOppFilter(e.target.value); setPlayerFilter(""); }}
-            className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/60">
-            <option value="all">All opponents</option>
-            {opponents.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        )}
         <input value={playerFilter} onChange={e => setPlayerFilter(e.target.value)} placeholder="Filter player…"
           className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-40" />
         <span className="text-xs text-white/30">{filtered.length} at-bats</span>
@@ -1062,8 +1036,9 @@ function TrendsView({ atBats, games }: { atBats: AtBatRecord[]; games: Game[] })
 
 // ── Game detail view ──────────────────────────────────────────────────────────
 
-function GameDetail({ game, batting, pitching, onBack, onDelete }: {
+function GameDetail({ game, batting, pitching, atBats, onBack, onDelete }: {
   game: Game; batting: BattingRow[]; pitching: PitchingRow[];
+  atBats: AtBatRecord[];
   onBack: () => void; onDelete: () => void;
 }) {
   const w = n(game.TeamScore) > n(game.OppScore);
@@ -1171,6 +1146,90 @@ function GameDetail({ game, batting, pitching, onBack, onDelete }: {
           </div>
         </div>
       )}
+
+      {/* Opponent at-bat analysis */}
+      {(() => {
+        const oppAbs = atBats.filter(ab => ab.Team === "opp");
+        if (oppAbs.length === 0) return null;
+        const players = Array.from(new Set(oppAbs.map(ab => ab.Player))).sort();
+        const pct = (num: number, den: number) => den ? Math.round((num / den) * 100) + "%" : "—";
+        const K = (arr: AtBatRecord[]) => arr.filter(ab => /K|SO/.test(ab.Result)).length;
+        const H = (arr: AtBatRecord[]) => arr.filter(ab => /^(1B|2B|3B|HR|H)/.test(ab.Result)).length;
+        const stats = players.map(player => {
+          const abs = oppAbs.filter(ab => ab.Player === player);
+          const ahead = abs.filter(ab => Number(ab.Balls) < Number(ab.Strikes));
+          const behind = abs.filter(ab => Number(ab.Balls) > Number(ab.Strikes));
+          const even = abs.filter(ab => Number(ab.Balls) === Number(ab.Strikes));
+          const hitAbs = abs.filter(ab => /^(1B|2B|3B|HR|H|G|F|L)/.test(ab.Result) && Number(ab.FieldedTo) > 0);
+          const pull = hitAbs.filter(ab => [5,6,7].includes(Number(ab.FieldedTo))).length;
+          const center = hitAbs.filter(ab => [1,2,8].includes(Number(ab.FieldedTo))).length;
+          const oppo = hitAbs.filter(ab => [3,4,9].includes(Number(ab.FieldedTo))).length;
+          return { player, total: abs.length, ahead, behind, even, hitAbs: hitAbs.length, pull, center, oppo };
+        });
+        return (
+          <div className="flex flex-col gap-4 pt-2 border-t border-white/10">
+            <p className="text-xs font-bold tracking-widest text-white/40 uppercase">Opponent Analysis</p>
+            <div>
+              <p className="text-xs text-white/30 mb-2">Performance by Count</p>
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="text-xs w-full">
+                  <thead><tr className="bg-white/5 text-white/40">
+                    <th className="text-left px-3 py-2 font-semibold">Batter</th>
+                    <th className="px-3 py-2 font-semibold text-right">PA</th>
+                    <th className="px-3 py-2 font-semibold text-right">Ahead K%</th>
+                    <th className="px-3 py-2 font-semibold text-right">Ahead H%</th>
+                    <th className="px-3 py-2 font-semibold text-right">Behind K%</th>
+                    <th className="px-3 py-2 font-semibold text-right">Behind H%</th>
+                    <th className="px-3 py-2 font-semibold text-right">Even K%</th>
+                    <th className="px-3 py-2 font-semibold text-right">Even H%</th>
+                  </tr></thead>
+                  <tbody>
+                    {stats.map((r, i) => (
+                      <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                        <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
+                        <td className="px-3 py-2 text-white/70 text-right">{r.total}</td>
+                        <td className="px-3 py-2 text-right text-green-400/80">{pct(K(r.ahead), r.ahead.length)}</td>
+                        <td className="px-3 py-2 text-right text-red-400/80">{pct(H(r.ahead), r.ahead.length)}</td>
+                        <td className="px-3 py-2 text-right text-green-400/80">{pct(K(r.behind), r.behind.length)}</td>
+                        <td className="px-3 py-2 text-right text-red-400/80">{pct(H(r.behind), r.behind.length)}</td>
+                        <td className="px-3 py-2 text-right text-white/50">{pct(K(r.even), r.even.length)}</td>
+                        <td className="px-3 py-2 text-right text-red-400/80">{pct(H(r.even), r.even.length)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {stats.some(r => r.hitAbs > 0) && (
+              <div>
+                <p className="text-xs text-white/30 mb-2">Hit Direction</p>
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="text-xs w-full">
+                    <thead><tr className="bg-white/5 text-white/40">
+                      <th className="text-left px-3 py-2 font-semibold">Batter</th>
+                      <th className="px-3 py-2 font-semibold text-right">Hits</th>
+                      <th className="px-3 py-2 font-semibold text-right">Pull%</th>
+                      <th className="px-3 py-2 font-semibold text-right">Center%</th>
+                      <th className="px-3 py-2 font-semibold text-right">Oppo%</th>
+                    </tr></thead>
+                    <tbody>
+                      {stats.filter(r => r.hitAbs > 0).map((r, i) => (
+                        <tr key={r.player} className={`border-t border-white/5 ${i % 2 === 0 ? "" : "bg-white/2"}`}>
+                          <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.player}</td>
+                          <td className="px-3 py-2 text-white/70 text-right">{r.hitAbs}</td>
+                          <td className="px-3 py-2 text-right text-accent">{pct(r.pull, r.hitAbs)}</td>
+                          <td className="px-3 py-2 text-right text-white/60">{pct(r.center, r.hitAbs)}</td>
+                          <td className="px-3 py-2 text-right text-blue-400/80">{pct(r.oppo, r.hitAbs)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
