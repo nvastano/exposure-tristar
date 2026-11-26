@@ -6,10 +6,11 @@ import dynamic from "next/dynamic";
 import { isCoachUnlocked, onCoachUnlockChanged } from "@/lib/coachAuth";
 import CoachUnlock, { useCoachUnlocked } from "@/components/CoachUnlock";
 import LogoLoader from "@/components/LogoLoader";
-import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { sheetsGet, sheetsGetAuthed, sheetsPost, sheetsPostAuthed } from "@/lib/sheets";
 import AssignedWorkCoach from "@/components/AssignedWorkCoach";
 import PracticeAttendance from "@/components/PracticeAttendance";
 import SeasonAnalysis from "@/components/SeasonAnalysis";
+import BirthCertificateUpload from "@/components/BirthCertificateUpload";
 
 // Lazy-load the heavy existing pages so only the active tab pays the cost
 const PracticePlan = dynamic(() => import("@/app/practice-plan/page"), { ssr: false, loading: () => <LogoLoader /> });
@@ -27,6 +28,7 @@ const TABS = [
 type TabId = typeof TABS[number]["id"];
 
 type PlayerProfile = {
+  Id: string;
   Player: string; DOB: string; HeightFt: string; HeightIn: string; Weight: string;
   Throws: string; Bats: string; OverhandSpeed: string; Number: string;
   Parent1Name: string; Parent1Email: string; Parent1Phone: string;
@@ -39,6 +41,344 @@ type PlayerRow = { Id: string; Name: string; Number?: string; Status?: string };
 function height(p: PlayerProfile) {
   if (!p.HeightFt) return "—";
   return `${p.HeightFt}'${p.HeightIn || "0"}"`;
+}
+
+// Converts whatever shape DOB comes back as (plain "YYYY-MM-DD" or an
+// ISO timestamp, if Sheets auto-detected it as a date) into the value a
+// <input type="date"> needs, using UTC getters to avoid a timezone-driven
+// day shift — matching the display formatting elsewhere in this file.
+function dobToInputValue(raw: string): string {
+  if (!raw) return "";
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  } catch {
+    return "";
+  }
+}
+
+type ProfileFormState = {
+  dob: string; heightFt: string; heightIn: string; weight: string;
+  throws: string; bats: string;
+  parent1Name: string; parent1Email: string; parent1Phone: string;
+  parent2Name: string; parent2Email: string; parent2Phone: string;
+  address: string; city: string; state: string; zip: string;
+};
+
+function formFromProfile(p: PlayerProfile | undefined): ProfileFormState {
+  return {
+    dob: p ? dobToInputValue(p.DOB) : "",
+    heightFt: p?.HeightFt || "",
+    heightIn: p?.HeightIn || "",
+    weight: p?.Weight || "",
+    throws: p?.Throws || "",
+    bats: p?.Bats || "",
+    parent1Name: p?.Parent1Name || "",
+    parent1Email: p?.Parent1Email || "",
+    parent1Phone: p?.Parent1Phone || "",
+    parent2Name: p?.Parent2Name || "",
+    parent2Email: p?.Parent2Email || "",
+    parent2Phone: p?.Parent2Phone || "",
+    address: p?.Address || "",
+    city: p?.City || "",
+    state: p?.State || "",
+    zip: p?.Zip || "",
+  };
+}
+
+const editInputCls =
+  "bg-white/5 border border-white/10 rounded px-2 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60 w-full";
+const editSelectCls = editInputCls + " appearance-none";
+
+function EditField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="text-white/40">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ProfileEditForm({
+  form,
+  onChange,
+}: {
+  form: ProfileFormState;
+  onChange: (key: keyof ProfileFormState, value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <EditField label="DOB">
+            <input type="date" value={form.dob} onChange={(e) => onChange("dob", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Height (ft)">
+            <input type="number" value={form.heightFt} onChange={(e) => onChange("heightFt", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Height (in)">
+            <input type="number" value={form.heightIn} onChange={(e) => onChange("heightIn", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Weight (lbs)">
+            <input type="number" value={form.weight} onChange={(e) => onChange("weight", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Throws">
+            <select value={form.throws} onChange={(e) => onChange("throws", e.target.value)} className={editSelectCls}>
+              <option value="">—</option>
+              <option>Right</option>
+              <option>Left</option>
+            </select>
+          </EditField>
+          <EditField label="Bats">
+            <select value={form.bats} onChange={(e) => onChange("bats", e.target.value)} className={editSelectCls}>
+              <option value="">—</option>
+              <option>Right</option>
+              <option>Left</option>
+              <option>Switch</option>
+            </select>
+          </EditField>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Parent / Guardian 1</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <EditField label="Name">
+            <input type="text" value={form.parent1Name} onChange={(e) => onChange("parent1Name", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Email">
+            <input type="email" value={form.parent1Email} onChange={(e) => onChange("parent1Email", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Phone">
+            <input type="tel" value={form.parent1Phone} onChange={(e) => onChange("parent1Phone", e.target.value)} className={editInputCls} />
+          </EditField>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Parent / Guardian 2</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <EditField label="Name">
+            <input type="text" value={form.parent2Name} onChange={(e) => onChange("parent2Name", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Email">
+            <input type="email" value={form.parent2Email} onChange={(e) => onChange("parent2Email", e.target.value)} className={editInputCls} />
+          </EditField>
+          <EditField label="Phone">
+            <input type="tel" value={form.parent2Phone} onChange={(e) => onChange("parent2Phone", e.target.value)} className={editInputCls} />
+          </EditField>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Address</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="col-span-2">
+            <EditField label="Street Address">
+              <input type="text" value={form.address} onChange={(e) => onChange("address", e.target.value)} className={editInputCls} />
+            </EditField>
+          </div>
+          <EditField label="City">
+            <input type="text" value={form.city} onChange={(e) => onChange("city", e.target.value)} className={editInputCls} />
+          </EditField>
+          <div className="grid grid-cols-2 gap-3">
+            <EditField label="State">
+              <input type="text" value={form.state} onChange={(e) => onChange("state", e.target.value)} maxLength={2} className={editInputCls} />
+            </EditField>
+            <EditField label="Zip">
+              <input type="text" value={form.zip} onChange={(e) => onChange("zip", e.target.value)} className={editInputCls} />
+            </EditField>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusToggle({
+  isActive,
+  isToggling,
+  onToggleStatus,
+}: {
+  isActive: boolean;
+  isToggling: boolean;
+  onToggleStatus: () => void;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggleStatus(); }}
+      disabled={isToggling}
+      className={`text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors ${
+        isActive
+          ? "border-green-500/40 text-green-400 hover:border-red-400/50 hover:text-red-400"
+          : "border-white/20 text-white/30 hover:border-green-500/40 hover:text-green-400"
+      } ${isToggling ? "opacity-40" : ""}`}
+      title={isActive ? "Mark inactive" : "Mark active"}
+    >
+      {isToggling ? "…" : isActive ? "Active" : "Inactive"}
+    </button>
+  );
+}
+
+function PlayerCard({
+  p,
+  profile,
+  isOpen,
+  onToggleExpand,
+  isToggling,
+  onToggleStatus,
+  onSaved,
+}: {
+  p: PlayerRow;
+  profile: PlayerProfile | undefined;
+  isOpen: boolean;
+  onToggleExpand: () => void;
+  isToggling: boolean;
+  onToggleStatus: () => void;
+  onSaved: () => void;
+}) {
+  const isActive = (p.Status || "active") !== "inactive";
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<ProfileFormState>(() => formFromProfile(profile));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEdit() {
+    setForm(formFromProfile(profile));
+    setError(null);
+    setEditing(true);
+  }
+
+  function setField(key: keyof ProfileFormState, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await sheetsPostAuthed("updatePlayerProfile", {
+        id: profile?.Id,
+        player: p.Name,
+        ...form,
+      });
+      setEditing(false);
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/3 overflow-hidden">
+      <button
+        onClick={onToggleExpand}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+      >
+        <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
+        <div className="flex items-center gap-3 text-xs text-white/40">
+          {profile ? (
+            <>
+              <span>{profile.Parent1Name || "—"}</span>
+              <span>{profile.Parent1Phone || "—"}</span>
+            </>
+          ) : (
+            <span className="text-white/30 italic">Not submitted</span>
+          )}
+          <StatusToggle isActive={isActive} isToggling={isToggling} onToggleStatus={onToggleStatus} />
+          <span className={`transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}>▾</span>
+        </div>
+      </button>
+      {isOpen && (
+        <div className="border-t border-white/10 p-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-bold tracking-widest text-white/30 uppercase">Family Profile</p>
+            {!editing && (
+              <button onClick={startEdit} className="text-xs text-accent hover:underline">
+                {profile ? "Edit" : "+ Add profile"}
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <ProfileEditForm form={form} onChange={setField} />
+          ) : profile ? (
+            <>
+              {/* Athlete */}
+              <div>
+                <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
+                  {[
+                    ["DOB", profile.DOB ? (() => { try { const d = new Date(profile.DOB); return `${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; } catch { return profile.DOB; } })() : "—"],
+                    ["Height", height(profile)],
+                    ["Weight", profile.Weight ? `${profile.Weight} lbs` : "—"],
+                    ["Throws", profile.Throws || "—"],
+                    ["Bats", profile.Bats || "—"],
+                  ].map(([l, v]) => (
+                    <div key={l} className="flex flex-col">
+                      <span className="text-white/30 text-xs">{l}</span>
+                      <span className="font-medium">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Parents */}
+              {[
+                { name: profile.Parent1Name, email: profile.Parent1Email, phone: profile.Parent1Phone, label: "Parent / Guardian 1" },
+                { name: profile.Parent2Name, email: profile.Parent2Email, phone: profile.Parent2Phone, label: "Parent / Guardian 2" },
+              ].filter((p) => p.name).map((p) => (
+                <div key={p.label}>
+                  <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">{p.label}</p>
+                  <div className="flex flex-col gap-0.5 text-sm">
+                    <span className="font-semibold">{p.name}</span>
+                    {p.email && <a href={`mailto:${p.email}`} className="text-accent hover:underline text-xs">{p.email}</a>}
+                    {p.phone && <a href={`tel:${p.phone}`} className="text-white/60 hover:text-white text-xs">{p.phone}</a>}
+                  </div>
+                </div>
+              ))}
+              {/* Address */}
+              {(profile.Address || profile.City) && (
+                <div>
+                  <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Address</p>
+                  <p className="text-sm text-white/70">
+                    {[profile.Address, profile.City, profile.State, profile.Zip].filter(Boolean).join(", ")}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-white/40">No family profile submitted yet.</p>
+          )}
+
+          {editing && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-md bg-accent px-4 py-1.5 text-sm font-bold text-white hover:bg-accent/80 transition-colors disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                onClick={() => { setEditing(false); setError(null); }}
+                disabled={saving}
+                className="text-sm text-white/40 hover:text-white"
+              >
+                Cancel
+              </button>
+              {error && <p className="text-accent text-xs">{error}</p>}
+            </div>
+          )}
+
+          <BirthCertificateUpload playerName={p.Name} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 const EXPORT_FIELDS = [
@@ -110,10 +450,12 @@ function RosterProfiles() {
   async function loadPlayers() {
     const [p, pr] = await Promise.all([
       (sheetsGet("players", { includeInactive: "1" }) as Promise<PlayerRow[]>),
-      (sheetsGet("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
+      // This component only renders once a coach has unlocked (see
+      // CoachesInner below), so a valid token is available here.
+      (sheetsGetAuthed("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
     ]);
     setPlayers(p);
-    setProfiles(pr);
+    setProfiles(Array.isArray(pr) ? pr : []);
     setLoading(false);
   }
 
@@ -154,101 +496,6 @@ function RosterProfiles() {
     const ordered = EXPORT_FIELDS.filter((f) => selectedFields.has(f.key)).map((f) => f.key);
     const csv = buildCsv(submittedProfiles, ordered);
     downloadCsv(csv, "tristar-roster.csv");
-  }
-
-  function PlayerCard({ p }: { p: PlayerRow }) {
-    const profile = profileMap.get(p.Name.trim().toLowerCase());
-    const isOpen = expanded === p.Name;
-    const isActive = (p.Status || "active") !== "inactive";
-    const isToggling = togglingId === p.Id;
-
-    const StatusToggle = () => (
-      <button
-        onClick={(e) => { e.stopPropagation(); toggleStatus(p); }}
-        disabled={isToggling}
-        className={`text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors ${
-          isActive
-            ? "border-green-500/40 text-green-400 hover:border-red-400/50 hover:text-red-400"
-            : "border-white/20 text-white/30 hover:border-green-500/40 hover:text-green-400"
-        } ${isToggling ? "opacity-40" : ""}`}
-        title={isActive ? "Mark inactive" : "Mark active"}
-      >
-        {isToggling ? "…" : isActive ? "Active" : "Inactive"}
-      </button>
-    );
-
-    if (!profile) {
-      return (
-        <div className="rounded-lg border border-white/10 bg-white/3 p-4 flex items-center justify-between gap-3">
-          <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-white/30 italic">Not submitted</span>
-            <StatusToggle />
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="rounded-lg border border-white/10 bg-white/3 overflow-hidden">
-        <button
-          onClick={() => setExpanded(isOpen ? null : p.Name)}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
-        >
-          <span className={`font-semibold text-sm ${!isActive ? "text-white/40" : ""}`}>{p.Name}</span>
-          <div className="flex items-center gap-3 text-xs text-white/40">
-            <StatusToggle />
-            <span>{profile.Parent1Name || "—"}</span>
-            <span>{profile.Parent1Phone || "—"}</span>
-            <span className={`transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}>▾</span>
-          </div>
-        </button>
-        {isOpen && (
-          <div className="border-t border-white/10 p-4 flex flex-col gap-4">
-            {/* Athlete */}
-            <div>
-              <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">Athlete</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
-                {[
-                  ["DOB", profile.DOB ? (() => { try { const d = new Date(profile.DOB); return `${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; } catch { return profile.DOB; } })() : "—"],
-                  ["Height", height(profile)],
-                  ["Weight", profile.Weight ? `${profile.Weight} lbs` : "—"],
-                  ["Throws", profile.Throws || "—"],
-                  ["Bats", profile.Bats || "—"],
-                ].map(([l, v]) => (
-                  <div key={l} className="flex flex-col">
-                    <span className="text-white/30 text-xs">{l}</span>
-                    <span className="font-medium">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Parents */}
-            {[
-              { name: profile.Parent1Name, email: profile.Parent1Email, phone: profile.Parent1Phone, label: "Parent / Guardian 1" },
-              { name: profile.Parent2Name, email: profile.Parent2Email, phone: profile.Parent2Phone, label: "Parent / Guardian 2" },
-            ].filter((p) => p.name).map((p) => (
-              <div key={p.label}>
-                <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-2">{p.label}</p>
-                <div className="flex flex-col gap-0.5 text-sm">
-                  <span className="font-semibold">{p.name}</span>
-                  {p.email && <a href={`mailto:${p.email}`} className="text-accent hover:underline text-xs">{p.email}</a>}
-                  {p.phone && <a href={`tel:${p.phone}`} className="text-white/60 hover:text-white text-xs">{p.phone}</a>}
-                </div>
-              </div>
-            ))}
-            {/* Address */}
-            {(profile.Address || profile.City) && (
-              <div>
-                <p className="text-xs font-bold tracking-widest text-white/30 uppercase mb-1">Address</p>
-                <p className="text-sm text-white/70">
-                  {[profile.Address, profile.City, profile.State, profile.Zip].filter(Boolean).join(", ")}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
   }
 
   return (
@@ -325,14 +572,36 @@ function RosterProfiles() {
       {submitted.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="text-xs font-bold tracking-widest text-white/40 uppercase">Submitted ({submitted.length})</h3>
-          {submitted.map((p) => <PlayerCard key={p.Id} p={p} />)}
+          {submitted.map((p) => (
+            <PlayerCard
+              key={p.Id}
+              p={p}
+              profile={profileMap.get(p.Name.trim().toLowerCase())}
+              isOpen={expanded === p.Name}
+              onToggleExpand={() => setExpanded(expanded === p.Name ? null : p.Name)}
+              isToggling={togglingId === p.Id}
+              onToggleStatus={() => toggleStatus(p)}
+              onSaved={loadPlayers}
+            />
+          ))}
         </div>
       )}
 
       {missing.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="text-xs font-bold tracking-widest text-white/30 uppercase">Not submitted ({missing.length})</h3>
-          {missing.map((p) => <PlayerCard key={p.Id} p={p} />)}
+          {missing.map((p) => (
+            <PlayerCard
+              key={p.Id}
+              p={p}
+              profile={profileMap.get(p.Name.trim().toLowerCase())}
+              isOpen={expanded === p.Name}
+              onToggleExpand={() => setExpanded(expanded === p.Name ? null : p.Name)}
+              isToggling={togglingId === p.Id}
+              onToggleStatus={() => toggleStatus(p)}
+              onSaved={loadPlayers}
+            />
+          ))}
         </div>
       )}
     </div>

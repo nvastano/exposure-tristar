@@ -66,7 +66,7 @@ export default function IntakePage() {
   useEffect(() => {
     Promise.all([
       sheetsGet("players") as Promise<PlayerRow[]>,
-      (sheetsGet("playerProfiles") as Promise<ProfileRow[]>).catch(() => [] as ProfileRow[]),
+      (sheetsGet("submittedProfileNames") as Promise<ProfileRow[]>).catch(() => [] as ProfileRow[]),
     ]).then(([p, profiles]) => {
       setPlayers(p);
       setSubmitted(new Set(profiles.map((r) => r.Player)));

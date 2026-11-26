@@ -3,6 +3,13 @@
  * Paste this into Extensions > Apps Script of your Google Sheet, then
  * Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
  * Copy the deployment URL into NEXT_PUBLIC_SHEETS_WEBAPP_URL in the app's env.
+ *
+ * Project Settings > Script Properties > add COACH_PASSWORD, set to the
+ * exact same value as the PASSWORD secret on the coach-auth-worker
+ * Cloudflare Worker (cloudflare/coach-auth-worker.js). This is what lets
+ * requireCoach_() verify coach tokens server-side for playerProfiles and
+ * the birth-certificate actions — without it those actions always report
+ * "unauthorized".
  */
 
 var PLAYERS_SHEET = "Players";
@@ -31,6 +38,54 @@ var PRACTICE_ATTENDANCE_SHEET = "PracticeAttendance";
 var TRYOUTS_SHEET = "Tryouts";
 var TRYOUT_ENTRIES_SHEET = "TryoutEntries";
 var DRILL_VIDEOS_FOLDER = "TriStar Drill Videos";
+var BIRTH_CERTIFICATES_SHEET = "BirthCertificates";
+// Left at Drive's default (private) sharing on purpose — unlike
+// DRILL_VIDEOS_FOLDER, nothing in this folder is ever set to "anyone with
+// the link". Files are only ever read back through getBirthCertificate,
+// which requires a verified coach token.
+var BIRTH_CERTIFICATES_FOLDER = "TriStar Birth Certificates (Private)";
+
+// Verifies a coach token minted by the Cloudflare coach-auth-worker.
+// Token format is "<expiresAtMs>.<hmacHex>", where hmacHex is an
+// HMAC-SHA256 of expiresAtMs keyed by the coach password. Requires a
+// Script Property named COACH_PASSWORD set to that same password
+// (Project Settings > Script Properties). Unlike the old client-side-only
+// "coachUnlocked" flag, this is checked here on the server for every
+// action that returns player/parent PII or birth certificates.
+function requireCoach_(token) {
+  if (!token) return false;
+  var parts = String(token).split(".");
+  if (parts.length !== 2) return false;
+  var expiresAt = Number(parts[0]);
+  if (!expiresAt || Date.now() > expiresAt) return false;
+  var secret = PropertiesService.getScriptProperties().getProperty("COACH_PASSWORD");
+  if (!secret) return false;
+  return hmacHex_(expiresAt, secret) === parts[1];
+}
+
+function hmacHex_(message, key) {
+  var bytes = Utilities.computeHmacSha256Signature(String(message), key);
+  return bytes
+    .map(function (b) {
+      var hex = ((b + 256) % 256).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    })
+    .join("");
+}
+
+function birthCertificatesSheet_() {
+  var sheet = getSheet_(BIRTH_CERTIFICATES_SHEET, [
+    "Id",
+    "Player",
+    "FileName",
+    "MimeType",
+    "DriveFileId",
+    "UploadedBy",
+    "UploadedAt",
+  ]);
+  backfillIds_(sheet);
+  return sheet;
+}
 
 // Posts a message to the team GroupMe via a Bot (https://dev.groupme.com/bots).
 // Set the bot id once via Project Settings > Script Properties > GROUPME_BOT_ID.
@@ -381,7 +436,86 @@ function doGet(e) {
   } else if (action === "fundraiserSales") {
     result = rowsToObjects_(getSheet_(FUNDRAISER_SALES_SHEET, ["Id","FundraiserId","Player","Units","Date","CreatedAt"]).getDataRange().getValues());
   } else if (action === "playerProfiles") {
-    result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"]).getDataRange().getValues());
+    // Contains parent contact info and address — coach-only, verified server-side.
+    if (!requireCoach_(e.parameter.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"]).getDataRange().getValues());
+    }
+  } else if (action === "birthdaysSoon") {
+    // Public, minimal view for the roster's "Upcoming Birthdays" banner:
+    // just a name and a day count, never the raw DOB or any parent info.
+    var bsRows = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player","DOB"]).getDataRange().getValues());
+    var bsNow = new Date();
+    result = bsRows
+      .map(function (row) {
+        var dob = row.DOB ? new Date(row.DOB) : null;
+        if (!dob || isNaN(dob.getTime())) return null;
+        var next = new Date(bsNow.getFullYear(), dob.getMonth(), dob.getDate());
+        if (next < bsNow) next.setFullYear(bsNow.getFullYear() + 1);
+        var days = Math.round((next.getTime() - bsNow.getTime()) / 86400000);
+        return days <= 14 ? { Player: row.Player, DaysUntil: days } : null;
+      })
+      .filter(function (x) {
+        return x !== null;
+      });
+  } else if (action === "submittedProfileNames") {
+    // Public, minimal view for the intake form's "already submitted" check:
+    // player names only, never DOB or parent info.
+    result = rowsToObjects_(getSheet_(PLAYER_PROFILES_SHEET, ["Id","Player"]).getDataRange().getValues()).map(function (row) {
+      return { Player: row.Player };
+    });
+  } else if (action === "listBirthCertificates") {
+    if (!requireCoach_(e.parameter.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      var lbcRows = rowsToObjects_(birthCertificatesSheet_().getDataRange().getValues());
+      if (e.parameter.player) {
+        var lbcP = e.parameter.player.trim().toLowerCase();
+        lbcRows = lbcRows.filter(function (row) {
+          return String(row.Player).trim().toLowerCase() === lbcP;
+        });
+      }
+      // Metadata only — never the file bytes or a Drive link here.
+      result = lbcRows.map(function (row) {
+        return {
+          Id: row.Id,
+          Player: row.Player,
+          FileName: row.FileName,
+          MimeType: row.MimeType,
+          UploadedBy: row.UploadedBy,
+          UploadedAt: row.UploadedAt,
+        };
+      });
+    }
+  } else if (action === "getBirthCertificate") {
+    if (!requireCoach_(e.parameter.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      var gbcSheet = birthCertificatesSheet_();
+      var gbcRow = findRowById_(gbcSheet, e.parameter.id);
+      if (gbcRow === -1) {
+        result = { error: "not found" };
+      } else {
+        var gbcHeaders = gbcSheet.getRange(1, 1, 1, gbcSheet.getLastColumn()).getValues()[0];
+        var gbcValues = gbcSheet.getRange(gbcRow, 1, 1, gbcSheet.getLastColumn()).getValues()[0];
+        var gbcData = {};
+        gbcHeaders.forEach(function (h, i) {
+          gbcData[h] = gbcValues[i];
+        });
+        try {
+          var gbcFile = DriveApp.getFileById(gbcData.DriveFileId);
+          result = {
+            ok: true,
+            filename: gbcData.FileName,
+            mimeType: gbcData.MimeType,
+            data: Utilities.base64Encode(gbcFile.getBlob().getBytes()),
+          };
+        } catch (err) {
+          result = { error: "could not read file: " + String(err) };
+        }
+      }
+    }
   } else if (action === "pitchLog") {
     result = rowsToObjects_(getSheet_(PITCH_LOG_SHEET, ["Id","Pitcher","Date","Context","Pitches","Innings","Notes","CreatedAt"]).getDataRange().getValues());
   } else if (action === "mumsColors") {
@@ -943,6 +1077,59 @@ function doPost(e) {
       CreatedAt: new Date().toISOString(),
     });
     result = { ok: true };
+  } else if (body.action === "updatePlayerProfile") {
+    // Coach-only edit of an existing family profile (or creating one on the
+    // spot for a player who hasn't submitted the public intake form). The
+    // public logPlayerProfile action above stays ungated since parents use
+    // it without a coach token; this one is for the roster admin view.
+    if (!requireCoach_(body.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      var uppHeaders = ["Id","Player","DOB","HeightFt","HeightIn","Weight","Throws","Bats","OverhandSpeed","Number","Parent1Name","Parent1Email","Parent1Phone","Parent2Name","Parent2Email","Parent2Phone","Address","City","State","Zip","CreatedAt"];
+      var uppSheet = getSheet_(PLAYER_PROFILES_SHEET, uppHeaders);
+      backfillIds_(uppSheet);
+      var uppRow = body.id ? findRowById_(uppSheet, body.id) : -1;
+      if (uppRow === -1) {
+        // No id (or a stale one) — fall back to matching by player name,
+        // so re-editing right after a profile was just created still works.
+        var uppData = uppSheet.getDataRange().getValues();
+        var uppNameCol = uppData[0].indexOf("Player");
+        var uppTarget = String(body.player || "").trim().toLowerCase();
+        for (var uppI = 1; uppI < uppData.length; uppI++) {
+          if (String(uppData[uppI][uppNameCol]).trim().toLowerCase() === uppTarget) {
+            uppRow = uppI + 1;
+            break;
+          }
+        }
+      }
+      var uppValues = {
+        Player: body.player,
+        DOB: body.dob || "",
+        HeightFt: body.heightFt || "",
+        HeightIn: body.heightIn || "",
+        Weight: body.weight || "",
+        Throws: body.throws || "",
+        Bats: body.bats || "",
+        Parent1Name: body.parent1Name || "",
+        Parent1Email: body.parent1Email || "",
+        Parent1Phone: body.parent1Phone || "",
+        Parent2Name: body.parent2Name || "",
+        Parent2Email: body.parent2Email || "",
+        Parent2Phone: body.parent2Phone || "",
+        Address: body.address || "",
+        City: body.city || "",
+        State: body.state || "",
+        Zip: body.zip || "",
+      };
+      if (uppRow === -1) {
+        uppValues.Id = newId_();
+        uppValues.CreatedAt = new Date().toISOString();
+        appendRowByHeaders_(uppSheet, uppValues);
+      } else {
+        setRowByHeaders_(uppSheet, uppRow, uppValues);
+      }
+      result = { ok: true };
+    }
   } else if (body.action === "uploadDrillVideo") {
     // Legacy small-file path (kept for compatibility)
     var folders = DriveApp.getFoldersByName(DRILL_VIDEOS_FOLDER);
@@ -1023,6 +1210,65 @@ function doPost(e) {
       }
     } catch (err) {
       result = { error: "uploadChunk threw: " + String(err) };
+    }
+  } else if (body.action === "uploadBirthCertificate") {
+    if (!requireCoach_(body.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      try {
+        var ubcFolders = DriveApp.getFoldersByName(BIRTH_CERTIFICATES_FOLDER);
+        var ubcFolder = ubcFolders.hasNext() ? ubcFolders.next() : DriveApp.createFolder(BIRTH_CERTIFICATES_FOLDER);
+        var ubcSheet = birthCertificatesSheet_();
+        var ubcPlayer = String(body.player || "").trim().toLowerCase();
+        // Replace semantics: a player should have at most one birth
+        // certificate on file, so trash the old Drive file and row
+        // rather than accumulating stale copies of a sensitive document.
+        rowsToObjects_(ubcSheet.getDataRange().getValues()).forEach(function (row) {
+          if (String(row.Player).trim().toLowerCase() === ubcPlayer) {
+            try {
+              DriveApp.getFileById(row.DriveFileId).setTrashed(true);
+            } catch (e2) {}
+            var oldRow = findRowById_(ubcSheet, row.Id);
+            if (oldRow !== -1) ubcSheet.deleteRow(oldRow);
+          }
+        });
+        var ubcBlob = Utilities.newBlob(Utilities.base64Decode(body.data), body.mimeType, body.filename);
+        var ubcFile = ubcFolder.createFile(ubcBlob);
+        // No setSharing() call here — the file stays private to this
+        // Apps Script project's Drive and is only ever read back through
+        // getBirthCertificate, which requires a verified coach token.
+        appendRowByHeaders_(ubcSheet, {
+          Id: newId_(),
+          Player: body.player,
+          FileName: body.filename,
+          MimeType: body.mimeType,
+          DriveFileId: ubcFile.getId(),
+          UploadedBy: body.uploadedBy || "coach",
+          UploadedAt: new Date().toISOString(),
+        });
+        result = { ok: true };
+      } catch (err) {
+        result = { error: "uploadBirthCertificate threw: " + String(err) };
+      }
+    }
+  } else if (body.action === "deleteBirthCertificate") {
+    if (!requireCoach_(body.token)) {
+      result = { error: "unauthorized" };
+    } else {
+      var dbcSheet = birthCertificatesSheet_();
+      var dbcRow = findRowById_(dbcSheet, body.id);
+      if (dbcRow === -1) {
+        result = { error: "not found" };
+      } else {
+        var dbcHeaders = dbcSheet.getRange(1, 1, 1, dbcSheet.getLastColumn()).getValues()[0];
+        var dbcValues = dbcSheet.getRange(dbcRow, 1, 1, dbcSheet.getLastColumn()).getValues()[0];
+        var dbcFileId = dbcValues[dbcHeaders.indexOf("DriveFileId")];
+        try {
+          DriveApp.getFileById(dbcFileId).setTrashed(true);
+        } catch (err) {}
+        dbcSheet.deleteRow(dbcRow);
+        result = { ok: true };
+      }
     }
   } else if (body.action === "setDriveSharing") {
     try {

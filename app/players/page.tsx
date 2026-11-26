@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { sheetsGet, sheetsPost } from "@/lib/sheets";
+import { sheetsGet, sheetsGetAuthed, sheetsPost } from "@/lib/sheets";
 import { normalizeSessions } from "@/lib/stats";
 import type { RawEntryRow, Session } from "@/lib/stats";
 import type { RawMetricRow } from "@/lib/metrics";
@@ -70,23 +70,18 @@ function ProfileCard({ profile }: { profile: PlayerProfile }) {
   );
 }
 
-function daysUntilBirthday(dob: string): number | null {
-  if (!dob) return null;
-  const today = new Date();
-  const birth = new Date(dob);
-  if (isNaN(birth.getTime())) return null;
-  const next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
-  if (next < today) next.setFullYear(today.getFullYear() + 1);
-  return Math.round((next.getTime() - today.getTime()) / 86400000);
-}
-
 type Assignment = { Id: string; TemplateId: string; PlayerName: string; StartDate: string; EndDate: string };
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+type UpcomingBirthday = { Player: string; DaysUntil: number };
+
 function PlayerRoster() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
-  const [profiles, setProfiles] = useState<PlayerProfile[]>([]);
+  // A minimal, unauthenticated view (name + day count only, never the raw
+  // DOB) — full profiles with DOB and parent info are coach-only and
+  // fetched separately once a coach has unlocked a specific player.
+  const [birthdays, setBirthdays] = useState<UpcomingBirthday[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const { unlocked } = useCoachUnlocked();
@@ -94,11 +89,11 @@ function PlayerRoster() {
   useEffect(() => {
     Promise.all([
       sheetsGet("players") as Promise<PlayerRow[]>,
-      sheetsGet("playerProfiles").catch(() => []) as Promise<PlayerProfile[]>,
+      sheetsGet("birthdaysSoon").catch(() => []) as Promise<UpcomingBirthday[]>,
       (sheetsGet("assignments") as Promise<Assignment[]>).catch(() => [] as Assignment[]),
-    ]).then(([p, pr, a]) => {
+    ]).then(([p, bd, a]) => {
       setPlayers(p);
-      setProfiles(pr);
+      setBirthdays(Array.isArray(bd) ? bd : []);
       setAssignments(Array.isArray(a) ? a : []);
     }).finally(() => setLoading(false));
   }, []);
@@ -124,10 +119,10 @@ function PlayerRoster() {
       .map(a => a.PlayerName.trim().toLowerCase())
   );
 
-  const upcomingBirthdays = profiles
-    .map((pr) => ({ name: pr.Player, days: daysUntilBirthday(pr.DOB), dob: pr.DOB }))
-    .filter((b): b is { name: string; days: number; dob: string } => b.days !== null && b.days <= 14)
+  const upcomingBirthdays = birthdays
+    .map((b) => ({ name: b.Player, days: b.DaysUntil }))
     .sort((a, b) => a.days - b.days);
+  const daysUntilByPlayer = new Map(birthdays.map((b) => [b.Player.trim().toLowerCase(), b.DaysUntil]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -153,8 +148,7 @@ function PlayerRoster() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {sorted.map((p) => {
-          const profile = profiles.find((pr) => pr.Player === p.Name);
-          const days = profile ? daysUntilBirthday(profile.DOB) : null;
+          const days = daysUntilByPlayer.get(p.Name.trim().toLowerCase()) ?? null;
           const isBirthday = days === 0;
           const isSoon = days !== null && days <= 14;
           const hasAssignment = assignedPlayers.has(p.Name.trim().toLowerCase());
@@ -207,14 +201,12 @@ function PlayerContent() {
     if (!playerName) return;
     setLoading(true);
     try {
-      const [players, entries, metricRows, notes, profiles] = await Promise.all([
+      const [players, entries, metricRows, notes] = await Promise.all([
         sheetsGet("players") as Promise<PlayerRow[]>,
         sheetsGet("entries", { player: playerName }) as Promise<RawEntryRow[]>,
         sheetsGet("metrics", { player: playerName }) as Promise<RawMetricRow[]>,
         sheetsGet("footageNotes", { player: playerName }) as Promise<RawFootageNoteRow[]>,
-        (sheetsGet("playerProfiles") as Promise<PlayerProfile[]>).catch(() => [] as PlayerProfile[]),
       ]);
-      setProfile(profiles.find((p) => p.Player.trim().toLowerCase() === playerName.trim().toLowerCase()) ?? null);
       const match = players.find(
         (p) => p.Name.trim().toLowerCase() === playerName.trim().toLowerCase()
       );
@@ -228,6 +220,31 @@ function PlayerContent() {
       setLoading(false);
     }
   }
+
+  // Player/parent profile (DOB, address, parent contact info) is PII and is
+  // only ever fetched once a coach has unlocked, using a token the Apps
+  // Script backend verifies server-side — not just hidden in the UI.
+  useEffect(() => {
+    if (!playerName || !unlocked) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const profiles = (await sheetsGetAuthed("playerProfiles")) as PlayerProfile[];
+        if (cancelled) return;
+        setProfile(
+          profiles.find((p) => p.Player.trim().toLowerCase() === playerName.trim().toLowerCase()) ?? null
+        );
+      } catch {
+        if (!cancelled) setProfile(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [playerName, unlocked]);
 
   async function handleSaveNumber() {
     if (!player) return;
