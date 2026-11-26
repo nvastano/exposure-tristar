@@ -469,6 +469,11 @@ export default function SeasonAnalysis() {
       setBatting(b);
       setPitching(p);
       setDbAtBats(ga);
+      // Opp sheets may not exist until backend is deployed
+      const [ob, op] = await Promise.all([
+        (sheetsGet("oppBatting") as Promise<OppBattingRow[]>).catch(() => []),
+        (sheetsGet("oppPitching") as Promise<OppPitchingRow[]>).catch(() => []),
+      ]);
       setOppBatting(ob || []);
       setOppPitching(op || []);
     } finally {
