@@ -523,6 +523,11 @@ export default function SeasonAnalysis() {
     if (file) handleFile(file);
   }, []);
 
+  const onPaste = useCallback((e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData.files).find(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    if (file) { e.preventDefault(); handleFile(file); }
+  }, []);
+
   const onDropScorebook = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDraggingScorebook(false);
     const file = e.dataTransfer.files[0];
@@ -622,8 +627,10 @@ export default function SeasonAnalysis() {
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
+        onPaste={onPaste}
         onClick={() => fileRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors text-center select-none ${
+        tabIndex={0}
+        className={`relative border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors text-center select-none outline-none focus:border-accent/50 ${
           dragging ? "border-accent bg-accent/10" : "border-white/15 hover:border-white/30 bg-white/3"
         }`}
       >
@@ -632,8 +639,8 @@ export default function SeasonAnalysis() {
           <p className="text-white/60 text-sm">Parsing PDF…</p>
         ) : (
           <>
-            <p className="text-white font-semibold text-sm">Drop GC Box Score PDF here</p>
-            <p className="text-white/40 text-xs mt-1">or click to browse — after each game, drop in the PDF and stats update automatically</p>
+            <p className="text-white font-semibold text-sm">Drop or paste GC Box Score PDF here</p>
+            <p className="text-white/40 text-xs mt-1">click to browse · drag & drop · or copy PDF then click here and press ⌘V</p>
           </>
         )}
       </div>
